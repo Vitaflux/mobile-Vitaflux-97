@@ -1,32 +1,30 @@
 import { Module } from '@nestjs/common';
+import {
+  ConfigModule,
+  ConfigService,
+} from '@nestjs/config';
 import { MongoloquentModule } from '@mongoloquent/nestjs';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PocModule } from './poc/poc.module';
 
-function getRequiredEnvironment(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(
-      `Environment variable ${name} belum diisi`,
-    );
-  }
-
-  return value;
-}
-
 @Module({
   imports: [
-    MongoloquentModule.forRoot({
-      name: 'default',
-      connection: getRequiredEnvironment(
-        'MONGOLOQUENT_DATABASE_URI',
-      ),
-      database: getRequiredEnvironment(
-        'MONGOLOQUENT_DATABASE_NAME',
-      ),
-      timezone: 'Asia/Jakarta',
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    MongoloquentModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: configService.getOrThrow<string>(
+          'MONGOLOQUENT_DATABASE_URI',
+        ),
+        database: configService.getOrThrow<string>(
+          'MONGOLOQUENT_DATABASE_NAME',
+        ),
+        timezone: 'Asia/Jakarta',
+      }),
       models: [],
       global: true,
     }),
