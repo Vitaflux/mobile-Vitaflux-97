@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PocModule } from './poc/poc.module';
 import { AuthModule } from './auth/auth.module';
+import { BloodsModule } from './bloods/bloods.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AuthModule } from './auth/auth.module';
     }),
     PocModule,
     AuthModule,
+    BloodsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

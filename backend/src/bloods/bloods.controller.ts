@@ -1,0 +1,30 @@
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { BloodsService } from './bloods.service';
+import { CreateBloodDto } from './dto/create-blood.dto';
+
+interface AuthenticatedRequest extends Request {
+  user: AuthenticatedUser;
+}
+
+@Controller('bloods')
+export class BloodsController {
+  constructor(private readonly bloodsService: BloodsService) {}
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('facility')
+  create(
+    @Req() request: AuthenticatedRequest,
+    @Body() createBloodDto: CreateBloodDto,
+  ) {
+    return this.bloodsService.createForFacility(
+      request.user.userId,
+      createBloodDto,
+    );
+  }
+}
