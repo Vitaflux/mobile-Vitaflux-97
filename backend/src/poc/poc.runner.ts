@@ -3,8 +3,7 @@ import { AppModule } from '../app.module';
 import { PocService } from './poc.service';
 
 async function bootstrap() {
-  const app =
-    await NestFactory.createApplicationContext(AppModule);
+  const app = await NestFactory.createApplicationContext(AppModule);
 
   try {
     const pocService = app.get(PocService);
