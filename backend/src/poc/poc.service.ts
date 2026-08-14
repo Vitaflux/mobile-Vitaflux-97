@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@mongoloquent/nestjs';
-import { Hospital } from './entities/hospital.model';
-import { User } from './entities/user.model';
+import { Hospital } from '../hospitals/entities/hospital.model';
+import { User } from '../users/entities/user.model';
 
 @Injectable()
 export class PocService {
@@ -19,9 +19,7 @@ export class PocService {
       .where('role', 'donor')
       .get();
 
-    const hospitals = await this.hospitalModel
-      .with('bloods')
-      .get();
+    const hospitals = await this.hospitalModel.with('bloods').get();
 
     return {
       message: 'Mongoloquent PoC berhasil',
