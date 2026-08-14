@@ -3,13 +3,13 @@ import { ObjectId } from 'mongodb';
 import { BloodType, RhesusType } from '../../common/constants';
 import { User } from '../../users/entities/user.model';
 import { Request } from '../../requests/entities/request.model';
+import type { GeoPoint } from '../../common/interfaces/geo-point.interface';
 
 export interface IUserProfile extends IMongoloquentSchema {
   user_id: ObjectId;
   blood_type: BloodType;
   rhesus: RhesusType;
-  latitude: number;
-  longitude: number;
+  location: GeoPoint;
   last_donor: Date | null;
   push_token: string | null;
 }
