@@ -4,6 +4,8 @@ import {
   UnauthorizedException,
   ConflictException,
 } from '@nestjs/common';
+import { ELIGIBILITY_WINDOW_DAYS } from '../common/constants';
+import { UserProfile } from '../profiles/entities/user-profile.model';
 import { InjectModel } from '@mongoloquent/nestjs';
 import { ObjectId } from 'mongodb';
 import { Hospital } from '../hospitals/entities/hospital.model';
@@ -18,6 +20,9 @@ export class BloodsService {
 
     @InjectModel(Hospital)
     private readonly hospitalModel: Hospital,
+
+    @InjectModel(UserProfile)
+    private readonly userProfileModel: UserProfile,
   ) {}
 
   async createForFacility(userId: string, createBloodDto: CreateBloodDto) {
@@ -178,6 +183,54 @@ export class BloodsService {
         schedule: blood.schedule,
         created_at: blood.created_at,
       },
+    };
+  }
+
+  async findMatchesForDonor(userId: string) {
+    if (!ObjectId.isValid(userId)) {
+      throw new UnauthorizedException('Invalid authenticated user');
+    }
+
+    const profile = await this.userProfileModel
+      .where('user_id', new ObjectId(userId))
+      .first();
+
+    if (!profile) {
+      throw new NotFoundException('Donor profile was not found for this user');
+    }
+
+    if (profile.last_donor) {
+      const eligibleAt = new Date(profile.last_donor.getTime());
+
+      eligibleAt.setUTCDate(eligibleAt.getUTCDate() + ELIGIBILITY_WINDOW_DAYS);
+
+      if (eligibleAt > new Date()) {
+        return {
+          success: true,
+          data: [],
+        };
+      }
+    }
+
+    const matchingBloods = await this.bloodModel
+      .where('blood_type', profile.blood_type)
+      .where('rhesus', profile.rhesus)
+      .get();
+
+    return {
+      success: true,
+      data: matchingBloods
+        .filter((blood) => blood.status_blood !== 'closed')
+        .map((blood) => ({
+          id: blood._id.toString(),
+          hospitals_id: blood.hospitals_id.toString(),
+          blood_type: blood.blood_type,
+          rhesus: blood.rhesus,
+          quantity: blood.quantity,
+          status_blood: blood.status_blood,
+          schedule: blood.schedule,
+          created_at: blood.created_at,
+        })),
     };
   }
 }
