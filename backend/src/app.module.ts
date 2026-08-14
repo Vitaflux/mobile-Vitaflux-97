@@ -7,6 +7,7 @@ import { PocModule } from './poc/poc.module';
 import { AuthModule } from './auth/auth.module';
 import { BloodsModule } from './bloods/bloods.module';
 import { ProfilesModule } from './profiles/profiles.module';
+import { RequestsModule } from './requests/requests.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ProfilesModule } from './profiles/profiles.module';
     AuthModule,
     BloodsModule,
     ProfilesModule,
+    RequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

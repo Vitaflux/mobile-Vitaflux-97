@@ -1,0 +1,52 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import type { Request } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { CreateRequestDto } from './dto/create-request.dto';
+import { RequestBloodParamDto } from './dto/request-blood-param.dto';
+import { RequestsService } from './requests.service';
+
+interface AuthenticatedRequest extends Request {
+  user: AuthenticatedUser;
+}
+
+@Controller('requests')
+export class RequestsController {
+  constructor(private readonly requestsService: RequestsService) {}
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('donor')
+  register(
+    @Req() request: AuthenticatedRequest,
+    @Body() createRequestDto: CreateRequestDto,
+  ) {
+    return this.requestsService.registerDonor(
+      request.user.userId,
+      createRequestDto,
+    );
+  }
+
+  @Get('blood/:bloodId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('facility')
+  findApplicants(
+    @Req() request: AuthenticatedRequest,
+    @Param() params: RequestBloodParamDto,
+  ) {
+    return this.requestsService.findApplicantsForFacility(
+      request.user.userId,
+      params.bloodId,
+    );
+  }
+}
