@@ -5,7 +5,7 @@ import {
   ConflictException,
   OnModuleInit,
 } from '@nestjs/common';
-import { ELIGIBILITY_WINDOW_DAYS } from '../common/constants';
+import { calculateDonorEligibility } from '../common/helpers/donor-eligibility.helper';
 import { UserProfile } from '../profiles/entities/user-profile.model';
 import { InjectModel } from '@mongoloquent/nestjs';
 import { ObjectId } from 'mongodb';
@@ -210,17 +210,13 @@ export class BloodsService implements OnModuleInit {
       throw new NotFoundException('Donor profile was not found for this user');
     }
 
-    if (profile.last_donor) {
-      const eligibleAt = new Date(profile.last_donor.getTime());
+    const eligibility = calculateDonorEligibility(profile.last_donor);
 
-      eligibleAt.setUTCDate(eligibleAt.getUTCDate() + ELIGIBILITY_WINDOW_DAYS);
-
-      if (eligibleAt > new Date()) {
-        return {
-          success: true,
-          data: [],
-        };
-      }
+    if (!eligibility.isEligible) {
+      return {
+        success: true,
+        data: [],
+      };
     }
 
     const hospitalCollection = this.hospitalModel
