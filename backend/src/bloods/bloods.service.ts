@@ -3,6 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException,
   ConflictException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { ELIGIBILITY_WINDOW_DAYS } from '../common/constants';
 import { UserProfile } from '../profiles/entities/user-profile.model';
@@ -13,17 +14,27 @@ import { CreateBloodDto } from './dto/create-blood.dto';
 import { Blood } from './entities/blood.model';
 
 @Injectable()
-export class BloodsService {
+export class BloodsService implements OnModuleInit {
   constructor(
     @InjectModel(Blood)
     private readonly bloodModel: Blood,
 
     @InjectModel(Hospital)
-    private readonly hospitalModel: Hospital,
+    private readonly hospitalModel: typeof Hospital,
 
     @InjectModel(UserProfile)
     private readonly userProfileModel: UserProfile,
   ) {}
+
+  async onModuleInit() {
+    const hospitalCollection = this.hospitalModel
+      .query()
+      .getMongoDBCollection();
+
+    await hospitalCollection.createIndex({
+      location: '2dsphere',
+    });
+  }
 
   async createForFacility(userId: string, createBloodDto: CreateBloodDto) {
     if (!ObjectId.isValid(userId)) {
@@ -186,7 +197,7 @@ export class BloodsService {
     };
   }
 
-  async findMatchesForDonor(userId: string) {
+  async findMatchesForDonor(userId: string, radius: number) {
     if (!ObjectId.isValid(userId)) {
       throw new UnauthorizedException('Invalid authenticated user');
     }
@@ -212,16 +223,68 @@ export class BloodsService {
       }
     }
 
+    const hospitalCollection = this.hospitalModel
+      .query()
+      .getMongoDBCollection();
+
+    const nearbyHospitals = await hospitalCollection
+      .find({
+        location: {
+          $near: {
+            $geometry: profile.location,
+            $maxDistance: radius,
+          },
+        },
+      })
+      .toArray();
+
+    if (nearbyHospitals.length === 0) {
+      return {
+        success: true,
+        data: [],
+      };
+    }
+
+    const hospitalIds = nearbyHospitals.map((hospital) => hospital._id);
+
     const matchingBloods = await this.bloodModel
       .where('blood_type', profile.blood_type)
       .where('rhesus', profile.rhesus)
+      .whereIn('hospitals_id', hospitalIds)
       .get();
 
-    return {
-      success: true,
-      data: matchingBloods
-        .filter((blood) => blood.status_blood !== 'closed')
-        .map((blood) => ({
+    const hospitalsById = new Map(
+      nearbyHospitals.map(
+        (hospital, index) =>
+          [
+            hospital._id.toString(),
+            {
+              hospital,
+              order: index,
+            },
+          ] as const,
+      ),
+    );
+
+    const matches = Array.from(matchingBloods)
+      .filter((blood) => blood.status_blood !== 'closed')
+      .sort((firstBlood, secondBlood) => {
+        const firstOrder =
+          hospitalsById.get(firstBlood.hospitals_id.toString())?.order ??
+          Number.MAX_SAFE_INTEGER;
+
+        const secondOrder =
+          hospitalsById.get(secondBlood.hospitals_id.toString())?.order ??
+          Number.MAX_SAFE_INTEGER;
+
+        return firstOrder - secondOrder;
+      })
+      .map((blood) => {
+        const hospitalData = hospitalsById.get(
+          blood.hospitals_id.toString(),
+        )?.hospital;
+
+        return {
           id: blood._id.toString(),
           hospitals_id: blood.hospitals_id.toString(),
           blood_type: blood.blood_type,
@@ -230,7 +293,19 @@ export class BloodsService {
           status_blood: blood.status_blood,
           schedule: blood.schedule,
           created_at: blood.created_at,
-        })),
+          hospital: hospitalData
+            ? {
+                id: hospitalData._id.toString(),
+                hospital_name: hospitalData.hospital_name,
+                location: hospitalData.location,
+              }
+            : null,
+        };
+      });
+
+    return {
+      success: true,
+      data: matches,
     };
   }
 }

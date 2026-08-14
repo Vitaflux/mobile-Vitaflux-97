@@ -7,6 +7,7 @@ import {
   Get,
   Param,
   Patch,
+  Query,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -16,6 +17,7 @@ import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface
 import { BloodsService } from './bloods.service';
 import { CreateBloodDto } from './dto/create-blood.dto';
 import { BloodIdParamDto } from './dto/blood-id-param.dto';
+import { MatchBloodsQueryDto } from './dto/match-bloods-query.dto';
 
 interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -48,8 +50,14 @@ export class BloodsController {
   @Get('matches')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('donor')
-  findMatches(@Req() request: AuthenticatedRequest) {
-    return this.bloodsService.findMatchesForDonor(request.user.userId);
+  findMatches(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: MatchBloodsQueryDto,
+  ) {
+    return this.bloodsService.findMatchesForDonor(
+      request.user.userId,
+      query.radius,
+    );
   }
 
   @Get(':id')
