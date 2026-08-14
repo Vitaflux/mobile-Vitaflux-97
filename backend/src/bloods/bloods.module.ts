@@ -5,9 +5,13 @@ import { Hospital } from '../hospitals/entities/hospital.model';
 import { BloodsController } from './bloods.controller';
 import { BloodsService } from './bloods.service';
 import { Blood } from './entities/blood.model';
+import { UserProfile } from '../profiles/entities/user-profile.model';
 
 @Module({
-  imports: [MongoloquentModule.forFeature([Blood, Hospital]), AuthModule],
+  imports: [
+    MongoloquentModule.forFeature([Blood, Hospital, UserProfile]),
+    AuthModule,
+  ],
   controllers: [BloodsController],
   providers: [BloodsService],
 })

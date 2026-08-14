@@ -45,6 +45,13 @@ export class BloodsController {
     return this.bloodsService.findAllForFacility(request.user.userId);
   }
 
+  @Get('matches')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('donor')
+  findMatches(@Req() request: AuthenticatedRequest) {
+    return this.bloodsService.findMatchesForDonor(request.user.userId);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('facility')
