@@ -6,6 +6,7 @@ import { UserProfile } from '../profiles/entities/user-profile.model';
 import { User } from '../users/entities/user.model';
 import { PocService } from './poc.service';
 import { Request } from '../requests/entities/request.model';
+import { GeospatialPocService } from './geospatial-poc.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { Request } from '../requests/entities/request.model';
       Request,
     ]),
   ],
-  providers: [PocService],
+  providers: [PocService, GeospatialPocService],
   exports: [PocService],
 })
 export class PocModule {}

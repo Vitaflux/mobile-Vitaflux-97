@@ -2,12 +2,11 @@ import { IMongoloquentSchema, Model } from '@mongoloquent/core';
 import { ObjectId } from 'mongodb';
 import { Blood } from '../../bloods/entities/blood.model';
 import { User } from '../../users/entities/user.model';
-
+import type { GeoPoint } from '../../common/interfaces/geo-point.interface';
 export interface IHospital extends IMongoloquentSchema {
   user_id: ObjectId;
   hospital_name: string;
-  latitude: number;
-  longitude: number;
+  location: GeoPoint;
   isVerified: boolean;
 }
 
