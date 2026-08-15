@@ -19,7 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "poc:verify": "node -r ts-node/register src/poc/poc.runner.ts",
-    "geo:verify": "node -r ts-node/register src/poc/geospatial-poc.runner.ts"
+    "geo:verify": "node -r ts-node/register src/poc/geospatial-poc.runner.ts",
+    "seed:demo": "node -r ts-node/register src/seeds/demo-seed.runner.ts"
   },
   "dependencies": {
     "@mongoloquent/core": "^4.0.0",
