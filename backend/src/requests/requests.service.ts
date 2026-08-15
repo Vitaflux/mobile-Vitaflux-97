@@ -1,19 +1,20 @@
+import { InjectModel } from '@mongoloquent/nestjs';
 import {
   ConflictException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { InjectModel } from '@mongoloquent/nestjs';
-import { randomUUID } from 'node:crypto';
 import { ObjectId } from 'mongodb';
+import { randomUUID } from 'node:crypto';
 import { Blood } from '../bloods/entities/blood.model';
 import { calculateDonorEligibility } from '../common/helpers/donor-eligibility.helper';
+import { Hospital } from '../hospitals/entities/hospital.model';
 import { UserProfile } from '../profiles/entities/user-profile.model';
+import { User } from '../users/entities/user.model';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { Request } from './entities/request.model';
-import { Hospital } from '../hospitals/entities/hospital.model';
-import { User } from '../users/entities/user.model';
+import { canTransitionRequestStatus } from './helpers/request-status.helper';
 
 @Injectable()
 export class RequestsService {
@@ -168,6 +169,60 @@ export class RequestsService {
     return {
       success: true,
       data: applicants,
+    };
+  }
+
+  async confirmForFacility(userId: string, requestId: string) {
+    if (!ObjectId.isValid(userId)) {
+      throw new UnauthorizedException('Invalid authenticated user');
+    }
+
+    const hospital = await this.hospitalModel
+      .where('user_id', new ObjectId(userId))
+      .first();
+
+    if (!hospital) {
+      throw new NotFoundException(
+        'Hospital profile was not found for this facility',
+      );
+    }
+
+    const donorRequest = await this.requestModel
+      .where('_id', new ObjectId(requestId))
+      .first();
+
+    if (!donorRequest) {
+      throw new NotFoundException('Donor request was not found');
+    }
+
+    const blood = await this.bloodModel
+      .where('_id', donorRequest.bloods_id)
+      .first();
+
+    if (!blood || !blood.hospitals_id.equals(hospital._id)) {
+      throw new NotFoundException('Donor request was not found');
+    }
+
+    if (!canTransitionRequestStatus(donorRequest.status, 'confirmed')) {
+      throw new ConflictException(
+        `Request status cannot transition from ${donorRequest.status} to confirmed`,
+      );
+    }
+
+    await this.requestModel.where('_id', donorRequest._id).update({
+      status: 'confirmed',
+    });
+
+    return {
+      success: true,
+      data: {
+        id: donorRequest._id.toString(),
+        bloods_id: donorRequest.bloods_id.toString(),
+        user_Profiles_id: donorRequest.user_Profiles_id.toString(),
+        screenings: donorRequest.screenings,
+        status: 'confirmed',
+        qr_token: donorRequest.qr_token,
+      },
     };
   }
 }
