@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -14,6 +15,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { RequestBloodParamDto } from './dto/request-blood-param.dto';
+import { RequestIdParamDto } from './dto/request-id-param.dto';
 import { RequestsService } from './requests.service';
 
 interface AuthenticatedRequest extends Request {
@@ -47,6 +49,19 @@ export class RequestsController {
     return this.requestsService.findApplicantsForFacility(
       request.user.userId,
       params.bloodId,
+    );
+  }
+
+  @Patch(':id/confirm')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('facility')
+  confirm(
+    @Req() request: AuthenticatedRequest,
+    @Param() params: RequestIdParamDto,
+  ) {
+    return this.requestsService.confirmForFacility(
+      request.user.userId,
+      params.id,
     );
   }
 }
