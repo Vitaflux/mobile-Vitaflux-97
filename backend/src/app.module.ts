@@ -9,6 +9,7 @@ import { BloodsModule } from './bloods/bloods.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { RequestsModule } from './requests/requests.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DemoSeedModule } from './seeds/demo-seed.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     ProfilesModule,
     RequestsModule,
     NotificationsModule,
+    DemoSeedModule,
   ],
   controllers: [AppController],
   providers: [AppService],
