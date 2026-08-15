@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { BloodsModule } from './bloods/bloods.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { RequestsModule } from './requests/requests.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { RequestsModule } from './requests/requests.module';
     BloodsModule,
     ProfilesModule,
     RequestsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

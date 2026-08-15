@@ -1,20 +1,24 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-  ConflictException,
-  OnModuleInit,
-} from '@nestjs/common';
-import { calculateDonorEligibility } from '../common/helpers/donor-eligibility.helper';
-import { UserProfile } from '../profiles/entities/user-profile.model';
 import { InjectModel } from '@mongoloquent/nestjs';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ObjectId } from 'mongodb';
+import { calculateDonorEligibility } from '../common/helpers/donor-eligibility.helper';
 import { Hospital } from '../hospitals/entities/hospital.model';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserProfile } from '../profiles/entities/user-profile.model';
 import { CreateBloodDto } from './dto/create-blood.dto';
 import { Blood } from './entities/blood.model';
 
 @Injectable()
 export class BloodsService implements OnModuleInit {
+  private readonly logger = new Logger(BloodsService.name);
+
   constructor(
     @InjectModel(Blood)
     private readonly bloodModel: Blood,
@@ -24,6 +28,8 @@ export class BloodsService implements OnModuleInit {
 
     @InjectModel(UserProfile)
     private readonly userProfileModel: UserProfile,
+
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -42,7 +48,7 @@ export class BloodsService implements OnModuleInit {
     }
 
     const hospital = await this.hospitalModel
-      .where(`user_id`, new ObjectId(userId))
+      .where('user_id', new ObjectId(userId))
       .first();
 
     if (!hospital) {
@@ -63,6 +69,32 @@ export class BloodsService implements OnModuleInit {
       schedule,
       created_at: createdAt,
     });
+
+    if (blood.status_blood === 'urgent') {
+      try {
+        const pushResult =
+          await this.notificationsService.sendUrgentBloodNotification({
+            bloodId: blood._id.toString(),
+            bloodType: blood.blood_type,
+            rhesus: blood.rhesus,
+            hospitalName: hospital.hospital_name,
+            hospitalLocation: hospital.location,
+          });
+
+        this.logger.log(
+          `Urgent notification processed for ${pushResult.matched_donors} donor(s)`,
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'Unknown push notification error';
+
+        this.logger.error(
+          `Failed to send urgent blood notification: ${errorMessage}`,
+        );
+      }
+    }
 
     return {
       success: true,
