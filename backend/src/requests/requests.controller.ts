@@ -16,6 +16,7 @@ import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface
 import { CreateRequestDto } from './dto/create-request.dto';
 import { RequestBloodParamDto } from './dto/request-blood-param.dto';
 import { RequestIdParamDto } from './dto/request-id-param.dto';
+import { CheckInRequestDto } from './dto/check-in-request.dto';
 import { RequestsService } from './requests.service';
 
 interface AuthenticatedRequest extends Request {
@@ -62,6 +63,19 @@ export class RequestsController {
     return this.requestsService.confirmForFacility(
       request.user.userId,
       params.id,
+    );
+  }
+
+  @Patch('check-in')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('facility')
+  checkIn(
+    @Req() request: AuthenticatedRequest,
+    @Body() checkInRequestDto: CheckInRequestDto,
+  ) {
+    return this.requestsService.checkInForFacility(
+      request.user.userId,
+      checkInRequestDto.qr_token,
     );
   }
 }
