@@ -5,6 +5,6 @@ export class MatchBloodsQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(50000)
+  @Max(20000)
   radius!: number;
 }
