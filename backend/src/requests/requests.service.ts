@@ -225,4 +225,58 @@ export class RequestsService {
       },
     };
   }
+
+  async checkInForFacility(userId: string, qrToken: string) {
+    if (!ObjectId.isValid(userId)) {
+      throw new UnauthorizedException('Invalid authenticated user');
+    }
+
+    const hospital = await this.hospitalModel
+      .where('user_id', new ObjectId(userId))
+      .first();
+
+    if (!hospital) {
+      throw new NotFoundException(
+        'Hospital profile was not found for this facility',
+      );
+    }
+
+    const donorRequest = await this.requestModel
+      .where('qr_token', qrToken)
+      .first();
+
+    if (!donorRequest) {
+      throw new NotFoundException('Donor request was not found');
+    }
+
+    const blood = await this.bloodModel
+      .where('_id', donorRequest.bloods_id)
+      .first();
+
+    if (!blood || !blood.hospitals_id.equals(hospital._id)) {
+      throw new NotFoundException('Donor request was not found');
+    }
+
+    if (!canTransitionRequestStatus(donorRequest.status, 'done')) {
+      throw new ConflictException(
+        `Request status cannot transition from ${donorRequest.status} to done`,
+      );
+    }
+
+    await this.requestModel.where('_id', donorRequest._id).update({
+      status: 'done',
+    });
+
+    return {
+      success: true,
+      data: {
+        id: donorRequest._id.toString(),
+        bloods_id: donorRequest.bloods_id.toString(),
+        user_Profiles_id: donorRequest.user_Profiles_id.toString(),
+        screenings: donorRequest.screenings,
+        status: 'done',
+        qr_token: donorRequest.qr_token,
+      },
+    };
+  }
 }
