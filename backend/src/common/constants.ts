@@ -19,3 +19,5 @@ export const REQUEST_STATUSES = ['registered', 'confirmed', 'done'] as const;
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
 export const ELIGIBILITY_WINDOW_DAYS = 90;
+
+export const URGENT_PUSH_RADIUS_METERS = 20000;
