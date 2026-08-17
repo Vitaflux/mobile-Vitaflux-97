@@ -45,8 +45,11 @@ export default function Register() {
     setLoading(true);
     try {
       await register({ email: email.trim(), password, role, name: name.trim() });
-      const r = useAuth.getState().user?.role;
-      router.replace(r === "facility" ? "/(facility)" : "/(donor)");
+      Alert.alert(
+        "Akun dibuat",
+        "Silakan masuk dengan email dan kata sandimu.",
+        [{ text: "Masuk", onPress: () => router.replace("/(auth)/login") }],
+      );
     } catch (e: any) {
       Alert.alert(
         "Daftar gagal",
