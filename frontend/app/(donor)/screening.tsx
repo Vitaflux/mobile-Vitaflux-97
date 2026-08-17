@@ -125,12 +125,11 @@ export default function Screening() {
 
     setSubmitting(true);
     try {
-      await registerToBlood(bloodsId, screeningAnswers);
-      Alert.alert(
-        "Pendaftaran berhasil",
-        "Kamu terdaftar sebagai calon pendonor. Faskes akan mengonfirmasi.",
-        [{ text: "OK", onPress: () => router.replace("/(donor)") }],
-      );
+      const created = await registerToBlood(bloodsId, screeningAnswers);
+      router.replace({
+        pathname: "/(donor)/status",
+        params: { req: JSON.stringify(created), data: params.data },
+      });
     } catch (e: any) {
       Alert.alert("Gagal daftar", errorMessage(e, "Coba lagi atau periksa koneksi."));
     } finally {
