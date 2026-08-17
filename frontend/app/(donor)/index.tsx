@@ -18,7 +18,10 @@ export default function DonorHome() {
         <Text className="mt-2 font-archivo text-body text-ink-muted">
           Halo{user?.email ? `, ${user.email}` : ""} — beranda asli menyusul (D-05).
         </Text>
-        <Pressable onPress={onLogout} className="mt-6 items-center rounded-pill border border-line py-3">
+        <Pressable onPress={() => router.push("/(donor)/profile")} className="mt-6 items-center rounded-pill bg-primary py-3 active:bg-primary-dark">
+          <Text className="font-archivo-bold text-body text-white">Buka Profil</Text>
+        </Pressable>
+        <Pressable onPress={onLogout} className="mt-3 items-center rounded-pill border border-line py-3">
           <Text className="font-archivo-semibold text-body text-ink">Keluar</Text>
         </Pressable>
       </View>

@@ -55,7 +55,6 @@ export default function Login() {
             Masuk untuk melihat kebutuhan darah di sekitarmu.
           </Text>
 
-          {/* Email */}
           <Text className="mb-2 font-archivo-medium text-caption text-ink">
             Email atau nomor HP
           </Text>
@@ -69,7 +68,6 @@ export default function Login() {
             className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
           />
 
-          {/* Password */}
           <Text className="mb-2 font-archivo-medium text-caption text-ink">
             Kata sandi
           </Text>
@@ -99,7 +97,6 @@ export default function Login() {
             </Text>
           </Pressable>
 
-          {/* Masuk */}
           <Pressable
             onPress={onSubmit}
             disabled={loading}
@@ -112,7 +109,6 @@ export default function Login() {
             )}
           </Pressable>
 
-          {/* Divider */}
           <View className="my-6 flex-row items-center">
             <View className="h-[1px] flex-1 bg-line" />
             <Text className="mx-4 font-archivo-medium text-overline tracking-overline text-ink-muted">
@@ -121,7 +117,6 @@ export default function Login() {
             <View className="h-[1px] flex-1 bg-line" />
           </View>
 
-          {/* Google (visual dulu) */}
           <Pressable
             onPress={() => Alert.alert("Google", "Login Google menyusul.")}
             className="items-center justify-center rounded-pill border border-line py-4"
@@ -131,7 +126,6 @@ export default function Login() {
             </Text>
           </Pressable>
 
-          {/* Daftar */}
           <View className="mt-6 flex-row justify-center">
             <Text className="font-archivo text-body text-ink-muted">
               Belum punya akun?{" "}
@@ -139,6 +133,20 @@ export default function Login() {
             <Pressable onPress={() => router.push("/(auth)/register")} hitSlop={8}>
               <Text className="font-archivo-bold text-body text-primary-dark">
                 Daftar
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* DEV — pratinjau layar tanpa backend. Hapus sebelum demo. */}
+          <View className="mt-4 flex-row justify-center gap-6">
+            <Pressable onPress={() => router.replace("/(donor)/profile")} hitSlop={8}>
+              <Text className="font-archivo-medium text-caption text-ink-muted">
+                DEV · Donor
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => router.replace("/(facility)")} hitSlop={8}>
+              <Text className="font-archivo-medium text-caption text-ink-muted">
+                DEV · Faskes
               </Text>
             </Pressable>
           </View>

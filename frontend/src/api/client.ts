@@ -29,11 +29,21 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Handler error global sederhana
+// Backend membungkus SEMUA respons: { success, data }.
+// Buka bungkusnya di sini supaya tiap fungsi api langsung dapat payload aslinya
+// (jadi `const { data } = await api.get(...)` = isi data, bukan wrapper).
 api.interceptors.response.use(
-  (res) => res,
-  (error) => {
-    // 401 → biar store/gate yang atur logout; di sini cukup teruskan
-    return Promise.reject(error);
+  (res) => {
+    const body = res.data;
+    if (
+      body &&
+      typeof body === "object" &&
+      "success" in body &&
+      "data" in body
+    ) {
+      res.data = (body as { data: unknown }).data;
+    }
+    return res;
   },
+  (error) => Promise.reject(error),
 );
