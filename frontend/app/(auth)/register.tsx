@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useAuth } from "../../src/store/auth";
+import { errorMessage } from "../../src/lib/errorMessage";
 
 type Role = "donor" | "facility";
 
@@ -43,13 +44,13 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register({ email: email.trim(), password, role, fullName: name.trim() });
+      await register({ email: email.trim(), password, role, name: name.trim() });
       const r = useAuth.getState().user?.role;
       router.replace(r === "facility" ? "/(facility)" : "/(donor)");
     } catch (e: any) {
       Alert.alert(
         "Daftar gagal",
-        e?.response?.data?.message ?? "Periksa data atau koneksi backend.",
+        errorMessage(e, "Periksa data atau koneksi backend."),
       );
     } finally {
       setLoading(false);

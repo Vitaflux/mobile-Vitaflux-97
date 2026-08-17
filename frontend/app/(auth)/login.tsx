@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useAuth } from "../../src/store/auth";
+import { errorMessage } from "../../src/lib/errorMessage";
 
 export default function Login() {
   const login = useAuth((s) => s.login);
@@ -32,7 +33,7 @@ export default function Login() {
     } catch (e: any) {
       Alert.alert(
         "Login gagal",
-        e?.response?.data?.message ?? "Periksa email/sandi atau koneksi backend.",
+        errorMessage(e, "Periksa email/sandi atau koneksi backend."),
       );
     } finally {
       setLoading(false);

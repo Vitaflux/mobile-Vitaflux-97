@@ -1,13 +1,25 @@
 import { api } from "./client";
-import type { UserProfile } from "../types/models";
+import type {
+  BloodType,
+  DonorProfile,
+  GeoPoint,
+  Rhesus,
+} from "../types/models";
 
-// ⚠️ Path & bentuk payload ASUMSI — samakan dengan backend B-06 (userProfiles).
+export interface UpdateProfileInput {
+  blood_type: BloodType;
+  rhesus: Rhesus;
+  location: GeoPoint; // WAJIB — GeoJSON Point [lng, lat]
+  last_donor?: string | null; // ISO date, opsional
+}
+
+// GET 404 kalau donor belum punya profil.
 export async function getMyProfile() {
-  const { data } = await api.get<UserProfile>("/profiles/me");
+  const { data } = await api.get<DonorProfile>("/profiles/me");
   return data;
 }
 
-export async function updateMyProfile(input: Record<string, unknown>) {
-  const { data } = await api.patch<UserProfile>("/profiles/me", input);
+export async function updateMyProfile(input: UpdateProfileInput) {
+  const { data } = await api.patch<DonorProfile>("/profiles/me", input);
   return data;
 }
