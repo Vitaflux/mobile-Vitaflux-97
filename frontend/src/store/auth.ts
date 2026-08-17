@@ -21,15 +21,9 @@ export const useAuth = create<AuthState>((set) => ({
     set({ user, status: "authed" });
   },
 
-  // Backend register tidak memberi token → langsung login setelah daftar.
+  // Hanya membuat akun — TIDAK auto-login. User masuk manual di layar login.
   register: async (input) => {
     await authApi.register(input);
-    const { access_token, user } = await authApi.login(
-      input.email,
-      input.password,
-    );
-    await saveToken(access_token);
-    set({ user, status: "authed" });
   },
 
   logout: async () => {
