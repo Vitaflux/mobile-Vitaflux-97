@@ -63,11 +63,11 @@ export default function BloodDetail() {
   const urgent = d.status_blood === "urgent";
 
   function onDaftar() {
-    // D-07: skrining kesehatan. Untuk sekarang placeholder.
-    Alert.alert(
-      "Daftar Donor",
-      "Lanjut ke skrining kesehatan dulu (dibangun di D-07).",
-    );
+    // Ke skrining kesehatan (D-07); teruskan data kebutuhan.
+    router.push({
+      pathname: "/(donor)/screening",
+      params: { data: params.data },
+    });
   }
 
   return (
