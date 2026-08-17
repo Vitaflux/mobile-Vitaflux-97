@@ -1,40 +1,34 @@
-// ⚠️ requests = PENDAFTARAN DONOR (donor daftar ikut suatu permintaan darah).
 import { api } from "./client";
-import type { DonorRequest, DonorRequestStatus } from "../types/models";
+import type { DonorRequest } from "../types/models";
 
-// Donor daftar ke sebuah permintaan darah (bloodId).
-export async function registerAsDonor(bloodId: string, scheduledAt?: string) {
+// Donor daftar ke kebutuhan — skrining WAJIB lolos (screeningPassed: true).
+export async function registerToBlood(
+  bloodsId: string,
+  screeningAnswers: Record<string, unknown>,
+) {
   const { data } = await api.post<DonorRequest>("/requests", {
-    bloodId,
-    scheduledAt,
+    bloods_id: bloodsId,
+    screenings: { screeningPassed: true, screeningAnswers },
   });
   return data;
 }
 
-// Pendaftaran milik donor yang login.
-export async function myDonorRequests() {
-  const { data } = await api.get<DonorRequest[]>("/requests/me");
+// Facility: pendaftar untuk sebuah kebutuhan
+export async function applicantsForBlood(bloodId: string) {
+  const { data } = await api.get<DonorRequest[]>(`/requests/blood/${bloodId}`);
   return data;
 }
 
-// Facility: lihat pendaftaran yang perlu di-approve untuk permintaannya.
-export async function pendingApprovals() {
-  const { data } = await api.get<DonorRequest[]>("/requests/pending");
+// Facility: konfirmasi pendaftar (registered → confirmed)
+export async function confirmRequest(id: string) {
+  const { data } = await api.patch<DonorRequest>(`/requests/${id}/confirm`, {});
   return data;
 }
 
-export async function updateRequestStatus(
-  id: string,
-  status: DonorRequestStatus,
-) {
-  const { data } = await api.patch<DonorRequest>(`/requests/${id}`, { status });
-  return data;
-}
-
-// QR check-in: facility scan token → tandai donor hadir.
+// Facility: check-in via QR (PATCH, body { qr_token })
 export async function checkInByQr(qrToken: string) {
-  const { data } = await api.post<DonorRequest>("/requests/check-in", {
-    qrToken,
+  const { data } = await api.patch<DonorRequest>("/requests/check-in", {
+    qr_token: qrToken,
   });
   return data;
 }

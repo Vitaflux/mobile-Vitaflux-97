@@ -1,14 +1,17 @@
-// ⚠️ bloods = PERMINTAAN DARAH dari rumah sakit (BUKAN pendaftaran donor).
 import { api } from "./client";
-import type { Blood, BloodStatus, BloodType } from "../types/models";
+import type { Blood, BloodStatus, BloodType, Rhesus } from "../types/models";
 
-// List permintaan darah (donor lihat yang tersedia; bisa filter).
-export async function listBloods(params?: {
-  city?: string;
-  status_blood?: BloodStatus;
-  bloodType?: BloodType;
-}) {
-  const { data } = await api.get<Blood[]>("/bloods", { params });
+// Donor: kebutuhan cocok dalam radius (METER, 1..20000).
+export async function matchBloods(radiusMeters: number) {
+  const { data } = await api.get<Blood[]>("/bloods/matches", {
+    params: { radius: radiusMeters },
+  });
+  return data;
+}
+
+// Facility: list kebutuhan milik faskes
+export async function listBloods() {
+  const { data } = await api.get<Blood[]>("/bloods");
   return data;
 }
 
@@ -17,18 +20,19 @@ export async function getBlood(id: string) {
   return data;
 }
 
-// Facility bikin permintaan darah baru.
+// Facility: buat kebutuhan (status_blood hanya "normal" | "urgent")
 export async function createBlood(input: {
-  bloodType: BloodType;
+  blood_type: BloodType;
+  rhesus: Rhesus;
   quantity: number;
-  status_blood: BloodStatus; // "normal" | "urgent" | "closed"
-  note?: string;
+  schedule: string; // ISO date
+  status_blood: Exclude<BloodStatus, "closed">;
 }) {
   const { data } = await api.post<Blood>("/bloods", input);
   return data;
 }
 
-export async function updateBloodStatus(id: string, status_blood: BloodStatus) {
-  const { data } = await api.patch<Blood>(`/bloods/${id}`, { status_blood });
+export async function closeBlood(id: string) {
+  const { data } = await api.patch<Blood>(`/bloods/${id}/close`, {});
   return data;
 }

@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useAuth } from "../../src/store/auth";
+import { errorMessage } from "../../src/lib/errorMessage";
 import { updateMyProfile } from "../../src/api/profiles";
 
 // ⚠️ Jendela kelayakan. Task B-03 + layar Status pakai 90 hari.
@@ -63,7 +64,7 @@ export default function DonorProfile() {
     } catch (e: any) {
       Alert.alert(
         "Gagal simpan",
-        e?.response?.data?.message ?? "Backend belum tersambung.",
+        errorMessage(e, "Backend belum tersambung."),
       );
     } finally {
       setSaving(false);
