@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
-
+// Token FINAL — disampel dari mockup "Design System" Vitaflux.
+// Aturan: merah maksimal ±10% layar; TEKS merah pakai primary-dark (#AE1800).
 module.exports = {
   content: ["./app/**/*.{js,jsx,ts,tsx}", "./src/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
@@ -7,33 +8,38 @@ module.exports = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: "#D92D3C", 
-          dark: "#B91C28",
-          soft: "#FDECEC",
+          DEFAULT: "#EC3013", // Accent
+          dark: "#AE1800", // Accent-700 — teks merah
+          tint: "#FFE0D9", // Accent-200
+          soft: "#FFF2EF", // Accent-100
         },
+        ink: { DEFAULT: "#201E1D", muted: "#605D5D" },
+        line: "#D7D3D3",
+        ground: "#F8F4F4",
         surface: "#FFFFFF",
-        muted: "#F7F7F8",
-        line: "#E5E7EB", 
-        ink: {
-          DEFAULT: "#1A1A1A",
-          muted: "#6B7280",
-        },
-       
-        status: {
-          registered: "#9CA3AF", 
-          confirmed: "#2563EB", 
-          done: "#16A34A", 
-          urgent: "#DC2626", 
-        },
-        success: "#16A34A",
-        warning: "#F59E0B",
-        error: "#DC2626",
-        info: "#2563EB",
       },
+      // Archivo per-weight. RN butuh nama family spesifik per berat
+      // (fontWeight biasa TIDAK ganti file font di RN).
+      fontFamily: {
+        archivo: ["Archivo_400Regular"],
+        "archivo-medium": ["Archivo_500Medium"],
+        "archivo-semibold": ["Archivo_600SemiBold"],
+        "archivo-bold": ["Archivo_700Bold"],
+        "archivo-black": ["Archivo_800ExtraBold"],
+      },
+      fontSize: {
+        display: "32px",
+        judul: "24px",
+        subjudul: "18px",
+        body: "16px",
+        caption: "14px",
+        overline: "11px",
+      },
+      letterSpacing: { overline: "0.14em" },
       borderRadius: {
         sm: "8px",
-        md: "12px",
-        lg: "20px",
+        card: "14px",
+        sheet: "22px",
         pill: "9999px",
       },
     },
