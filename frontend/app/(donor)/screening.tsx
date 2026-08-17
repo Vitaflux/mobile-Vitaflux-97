@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   View,
   Text,
@@ -5,11 +6,14 @@ import {
   Pressable,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
+import { registerToBlood } from "../../src/api/requests";
+import { errorMessage } from "../../src/lib/errorMessage";
 
 const QS = [
   {
@@ -67,6 +71,8 @@ export default function Screening() {
     },
   });
 
+  const [submitting, setSubmitting] = useState(false);
+
   const v = watch();
   const weightNum = Number(v.weight);
   const weightAnswered = v.weight.trim() !== "" && !isNaN(weightNum);
@@ -97,19 +103,39 @@ export default function Screening() {
         ok: false,
       };
 
-  function onLanjut() {
-    if (!pass) return;
+  async function onLanjut() {
+    if (!pass || submitting) return;
+
+    let bloodsId: string | undefined;
+    try {
+      const parsed = params.data ? JSON.parse(params.data) : null;
+      bloodsId = parsed?.id;
+    } catch {
+      bloodsId = undefined;
+    }
+    if (!bloodsId) {
+      Alert.alert("Data kurang", "Kebutuhan tidak dikenali. Kembali dan pilih ulang.");
+      return;
+    }
+
     const screeningAnswers = {
       weight_kg: weightNum,
       ...Object.fromEntries(QS.map((q) => [q.key, v[q.key]])),
     };
-    // D-08: POST /requests { bloods_id, screenings: { screeningPassed:true, screeningAnswers } }
-    Alert.alert(
-      "Skrining lolos",
-      "Lanjut ke pendaftaran (dibangun di D-08).",
-    );
-    // (D-08 akan menerima params: { data, screening })
-    console.log("screeningAnswers", screeningAnswers, params.data);
+
+    setSubmitting(true);
+    try {
+      await registerToBlood(bloodsId, screeningAnswers);
+      Alert.alert(
+        "Pendaftaran berhasil",
+        "Kamu terdaftar sebagai calon pendonor. Faskes akan mengonfirmasi.",
+        [{ text: "OK", onPress: () => router.replace("/(donor)") }],
+      );
+    } catch (e: any) {
+      Alert.alert("Gagal daftar", errorMessage(e, "Coba lagi atau periksa koneksi."));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -226,18 +252,22 @@ export default function Screening() {
 
           <Pressable
             onPress={onLanjut}
-            disabled={!pass}
+            disabled={!pass || submitting}
             className={`items-center rounded-pill py-4 ${
               pass ? "bg-primary active:bg-primary-dark" : "bg-line"
             }`}
           >
-            <Text
-              className={`font-archivo-bold text-body ${
-                pass ? "text-white" : "text-ink-muted"
-              }`}
-            >
-              Lanjut ke pendaftaran
-            </Text>
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text
+                className={`font-archivo-bold text-body ${
+                  pass ? "text-white" : "text-ink-muted"
+                }`}
+              >
+                Lanjut ke pendaftaran
+              </Text>
+            )}
           </Pressable>
         </View>
       </SafeAreaView>
