@@ -222,6 +222,17 @@ export default function DonorHome() {
                       key={b.id}
                       blood={b}
                       distance={distanceKm(b.hospital?.location)}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(donor)/detail",
+                          params: {
+                            data: JSON.stringify({
+                              ...b,
+                              distanceKm: distanceKm(b.hospital?.location),
+                            }),
+                          },
+                        })
+                      }
                     />
                   ))}
                 </View>
@@ -237,13 +248,18 @@ export default function DonorHome() {
 function MatchCard({
   blood,
   distance,
+  onPress,
 }: {
   blood: Match;
   distance: number | null;
+  onPress: () => void;
 }) {
   const urgent = blood.status_blood === "urgent";
   return (
-    <View className="rounded-[18px] border border-line bg-surface p-4">
+    <Pressable
+      onPress={onPress}
+      className="rounded-[18px] border border-line bg-surface p-4 active:bg-ground"
+    >
       <View className="flex-row items-center justify-between">
         <View
           className={`rounded-pill px-3 py-1 ${urgent ? "bg-primary" : "bg-ground"}`}
@@ -274,6 +290,6 @@ function MatchCard({
       <Text className="mt-2 font-archivo-semibold text-caption text-ink">
         {blood.quantity} kantong dibutuhkan
       </Text>
-    </View>
+    </Pressable>
   );
 }
