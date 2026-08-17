@@ -1,48 +1,46 @@
 /** @type {import('tailwindcss').Config} */
-// Token FINAL — disampel langsung dari mockup "Design System" Vitaflux.
-// Aturan pakai: merah maksimal ±10% luas layar; TEKS merah selalu pakai
-// primary-dark (#AE1800) biar kontras ≥ 4.5:1.
+// Token FINAL — disampel dari mockup "Design System" Vitaflux.
+// Aturan: merah maksimal ±10% layar; TEKS merah pakai primary-dark (#AE1800).
 module.exports = {
   content: ["./app/**/*.{js,jsx,ts,tsx}", "./src/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
       colors: {
-        // "Accent" pada design system
         primary: {
           DEFAULT: "#EC3013", // Accent
-          dark: "#AE1800", // Accent-700 — untuk teks merah
-          tint: "#FFE0D9", // Accent-200 — badge tint
-          soft: "#FFF2EF", // Accent-100 — bidang lembut
+          dark: "#AE1800", // Accent-700 — teks merah
+          tint: "#FFE0D9", // Accent-200
+          soft: "#FFF2EF", // Accent-100
         },
-        ink: {
-          DEFAULT: "#201E1D", // teks utama
-          muted: "#605D5D", // Ink-70 — teks sekunder
-        },
-        line: "#D7D3D3", // border
-        ground: "#F8F4F4", // background layar
-        surface: "#FFFFFF", // kartu / input
+        ink: { DEFAULT: "#201E1D", muted: "#605D5D" },
+        line: "#D7D3D3",
+        ground: "#F8F4F4",
+        surface: "#FFFFFF",
       },
-      // Archivo — perlu di-load dulu via @expo-google-fonts/archivo (tugas kecil terpisah).
+      // Archivo per-weight. RN butuh nama family spesifik per berat
+      // (fontWeight biasa TIDAK ganti file font di RN).
       fontFamily: {
-        sans: ["Archivo"],
+        archivo: ["Archivo_400Regular"],
+        "archivo-medium": ["Archivo_500Medium"],
+        "archivo-semibold": ["Archivo_600SemiBold"],
+        "archivo-bold": ["Archivo_700Bold"],
+        "archivo-black": ["Archivo_800ExtraBold"],
       },
       fontSize: {
-        display: "32px", // pasangkan font-extrabold (800)
-        judul: "24px", // font-bold (700)
-        subjudul: "18px", // font-bold (700)
-        body: "16px", // font-normal (400) — ukuran dasar
-        caption: "14px", // font-medium (500)
-        overline: "11px", // font-bold (700) + tracking-overline
+        display: "32px",
+        judul: "24px",
+        subjudul: "18px",
+        body: "16px",
+        caption: "14px",
+        overline: "11px",
       },
-      letterSpacing: {
-        overline: "0.14em",
-      },
+      letterSpacing: { overline: "0.14em" },
       borderRadius: {
-        sm: "8px", // kecil
-        card: "14px", // kartu
-        sheet: "22px", // bottom sheet
-        pill: "9999px", // tombol & badge
+        sm: "8px",
+        card: "14px",
+        sheet: "22px",
+        pill: "9999px",
       },
     },
   },
