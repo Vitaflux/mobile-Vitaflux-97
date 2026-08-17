@@ -54,8 +54,7 @@ export default function FacilityDashboard() {
     router.replace("/(auth)/login");
   }
 
-  const onCreate = () =>
-    Alert.alert("Buat kebutuhan", "Form buat kebutuhan dibangun di D-12.");
+  const onCreate = () => router.push("/(facility)/create");
   const onManage = () =>
     Alert.alert("Kelola", "Daftar pendaftar + konfirmasi dibangun di D-13.");
 
