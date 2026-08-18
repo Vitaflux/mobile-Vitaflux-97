@@ -25,6 +25,14 @@ export async function confirmRequest(id: string) {
   return data;
 }
 
+export async function myRequests(status?: DonorRequest["status"]) {
+  const { data } = await api.get<DonorRequest[]>("/requests/me", {
+    params: status ? { status } : undefined,
+  });
+
+  return data;
+}
+
 // Facility: check-in via QR (PATCH, body { qr_token })
 export async function checkInByQr(qrToken: string) {
   const { data } = await api.patch<DonorRequest>("/requests/check-in", {
