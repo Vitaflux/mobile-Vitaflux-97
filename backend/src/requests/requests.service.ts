@@ -257,9 +257,18 @@ export class RequestsService {
     };
   }
 
-  async checkInForFacility(userId: string, qrToken: string, volumeMl?: number) {
+  async checkInForFacility(
+    userId: string,
+    qrToken?: string,
+    volumeMl?: number,
+    code?: string,
+  ) {
     if (!ObjectId.isValid(userId)) {
       throw new UnauthorizedException('Invalid authenticated user');
+    }
+
+    if (!qrToken && !code) {
+      throw new BadRequestException('QR token or code is required');
     }
 
     const hospital = await this.hospitalModel
@@ -272,9 +281,9 @@ export class RequestsService {
       );
     }
 
-    const donorRequest = await this.requestModel
-      .where('qr_token', qrToken)
-      .first();
+    const donorRequest = qrToken
+      ? await this.requestModel.where('qr_token', qrToken).first()
+      : await this.requestModel.where('code', code).first();
 
     if (!donorRequest) {
       throw new NotFoundException('Donor request was not found');

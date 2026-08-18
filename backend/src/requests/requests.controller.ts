@@ -92,6 +92,7 @@ export class RequestsController {
       request.user.userId,
       checkInRequestDto.qr_token,
       checkInRequestDto.volume_ml,
+      checkInRequestDto.code,
     );
   }
 }

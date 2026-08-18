@@ -74,7 +74,7 @@ describe('RequestsService check-in schedule validation', () => {
       {} as User,
     );
 
-    return { service, update };
+    return { service, update, requestModel };
   }
 
   beforeEach(() => {
@@ -135,5 +135,33 @@ describe('RequestsService check-in schedule validation', () => {
       checked_in_at: now,
       volume_ml: 350,
     });
+  });
+
+  it('finds and completes check-in using a manual code', async () => {
+    const { service, requestModel } = createService(
+      new Date('2026-08-18T07:00:00.000Z'),
+      new Date('2026-08-18T09:00:00.000Z'),
+    );
+
+    const result = await service.checkInForFacility(
+      userId.toString(),
+      undefined,
+      350,
+      'VF-8241',
+    );
+
+    expect(requestModel.where).toHaveBeenNthCalledWith(1, 'code', 'VF-8241');
+    expect(result.data.status).toBe('done');
+  });
+
+  it('rejects check-in without a QR token or manual code', async () => {
+    const { service } = createService(
+      new Date('2026-08-18T07:00:00.000Z'),
+      new Date('2026-08-18T09:00:00.000Z'),
+    );
+
+    await expect(service.checkInForFacility(userId.toString())).rejects.toThrow(
+      new BadRequestException('QR token or code is required'),
+    );
   });
 });
