@@ -10,6 +10,7 @@ import { ProfilesModule } from './profiles/profiles.module';
 import { RequestsModule } from './requests/requests.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { DemoSeedModule } from './seeds/demo-seed.module';
+import { HospitalsModule } from './hospitals/hospitals.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { DemoSeedModule } from './seeds/demo-seed.module';
     RequestsModule,
     NotificationsModule,
     DemoSeedModule,
+    HospitalsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
