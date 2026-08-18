@@ -7,10 +7,11 @@ import { BloodsController } from './bloods.controller';
 import { BloodsService } from './bloods.service';
 import { Blood } from './entities/blood.model';
 import { UserProfile } from '../profiles/entities/user-profile.model';
+import { Request } from '../requests/entities/request.model';
 
 @Module({
   imports: [
-    MongoloquentModule.forFeature([Blood, Hospital, UserProfile]),
+    MongoloquentModule.forFeature([Blood, Hospital, UserProfile, Request]),
     AuthModule,
     NotificationsModule,
   ],
