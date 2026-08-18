@@ -2,15 +2,20 @@ import { InjectModel } from '@mongoloquent/nestjs';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { Expo } from 'expo-server-sdk';
 import type { ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
 import { ObjectId } from 'mongodb';
 import type { BloodType, RhesusType } from '../common/constants';
-import { URGENT_PUSH_RADIUS_METERS } from '../common/constants';
+import {
+  ELIGIBILITY_REMINDER_DAYS,
+  URGENT_PUSH_RADIUS_METERS,
+} from '../common/constants';
 import { calculateDonorEligibility } from '../common/helpers/donor-eligibility.helper';
 import type { GeoPoint } from '../common/interfaces/geo-point.interface';
 import { UserProfile } from '../profiles/entities/user-profile.model';
@@ -25,6 +30,7 @@ interface UrgentBloodNotification {
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
+  private readonly logger = new Logger(NotificationsService.name);
   private readonly expo = new Expo();
 
   constructor(
@@ -137,5 +143,85 @@ export class NotificationsService implements OnModuleInit {
       matched_donors: messages.length,
       tickets,
     };
+  }
+
+  async sendEligibilityReminderNotifications(now: Date = new Date()) {
+    const userProfileCollection = this.userProfileModel
+      .query()
+      .getMongoDBCollection();
+
+    const profiles = await userProfileCollection
+      .find({
+        last_donor: {
+          $type: 'date',
+        },
+        push_token: {
+          $type: 'string',
+          $ne: '',
+        },
+      })
+      .toArray();
+
+    const messages = profiles.flatMap((profile): ExpoPushMessage[] => {
+      const eligibility = calculateDonorEligibility(
+        profile.last_donor ?? null,
+        now,
+      );
+      const pushToken = profile.push_token;
+
+      if (
+        eligibility.remainingDays !== ELIGIBILITY_REMINDER_DAYS ||
+        !Expo.isExpoPushToken(pushToken)
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          to: pushToken,
+          sound: 'default',
+          title: 'Pengingat Donor',
+          body: '3 hari lagi kamu sudah boleh donor kembali',
+          data: {
+            type: 'donor_eligibility_reminder',
+            eligible_at: eligibility.eligibleAt?.toISOString() ?? null,
+          },
+        },
+      ];
+    });
+
+    if (messages.length === 0) {
+      return {
+        reminded_donors: 0,
+        tickets: [],
+      };
+    }
+
+    const chunks = this.expo.chunkPushNotifications(messages);
+    const tickets: ExpoPushTicket[] = [];
+
+    for (const chunk of chunks) {
+      const ticketChunk = await this.expo.sendPushNotificationsAsync(chunk);
+
+      tickets.push(...ticketChunk);
+    }
+
+    return {
+      reminded_donors: messages.length,
+      tickets,
+    };
+  }
+
+  @Cron('0 0 9 * * *', {
+    name: 'donor-eligibility-reminder',
+    timeZone: 'Asia/Jakarta',
+    waitForCompletion: true,
+  })
+  async handleEligibilityReminderCron() {
+    const result = await this.sendEligibilityReminderNotifications();
+
+    this.logger.log(
+      `Eligibility reminder processed for ${result.reminded_donors} donor(s)`,
+    );
   }
 }
