@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongoloquentModule } from '@mongoloquent/nestjs';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PocModule } from './poc/poc.module';
@@ -17,6 +18,7 @@ import { HospitalsModule } from './hospitals/hospitals.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     MongoloquentModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
