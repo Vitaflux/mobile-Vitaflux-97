@@ -1,3 +1,27 @@
-// Backend TIDAK punya endpoint /hospitals (hanya model, tanpa controller).
-// Pencocokan untuk donor lewat GET /bloods/matches?radius= (lihat api/bloods.ts).
-export {};
+import { api } from "./client";
+
+export type FacilityProfile = {
+  id: string;
+  hospital_name: string;
+  code: string | null;
+  address: string | null;
+  unit_donor: string | null;
+  pic_name: string | null;
+  contact: string | null;
+  hospital_type: string | null;
+  isVerified: boolean;
+  location: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+  stats: {
+    total_collected: number;
+    attendance_rate: number;
+  };
+};
+
+export async function getMyHospital() {
+  const { data } = await api.get<FacilityProfile>("/hospitals/me");
+
+  return data;
+}
