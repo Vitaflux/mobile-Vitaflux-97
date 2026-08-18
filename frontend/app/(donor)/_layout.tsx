@@ -68,6 +68,13 @@ export default function DonorLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="pengingat"
+        options={{
+          href: null,
+        }}
+      />
+
       {/* Route push, bukan tab */}
       <Tabs.Screen
         name="detail"
