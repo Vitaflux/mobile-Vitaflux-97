@@ -55,8 +55,8 @@ export default function FacilityDashboard() {
   }
 
   const onCreate = () => router.push("/(facility)/create");
-  const onManage = () =>
-    Alert.alert("Kelola", "Daftar pendaftar + konfirmasi dibangun di D-13.");
+  const onManage = (bloodId: string) =>
+    router.push({ pathname: "/(facility)/applicants", params: { bloodId } });
 
   return (
     <View className="flex-1 bg-ground">
@@ -145,7 +145,7 @@ export default function FacilityDashboard() {
                   {aktif.map((b) => (
                     <Pressable
                       key={b.id}
-                      onPress={onManage}
+                      onPress={() => onManage(b.id)}
                       className="rounded-[18px] border border-line bg-surface p-4 active:bg-ground"
                     >
                       <View className="flex-row items-center justify-between">
