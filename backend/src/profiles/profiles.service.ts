@@ -8,12 +8,20 @@ import { ObjectId } from 'mongodb';
 import { calculateDonorEligibility } from '../common/helpers/donor-eligibility.helper';
 import { UpdateDonorProfileDto } from './dto/update-donor-profile.dto';
 import { UserProfile } from './entities/user-profile.model';
+import { Request } from '../requests/entities/request.model';
+import { User } from '../users/entities/user.model';
 
 @Injectable()
 export class ProfilesService {
   constructor(
     @InjectModel(UserProfile)
     private readonly userProfileModel: UserProfile,
+
+    @InjectModel(Request)
+    private readonly requestModel: Request,
+
+    @InjectModel(User)
+    private readonly userModel: User,
   ) {}
 
   async getForDonor(userId: string) {
@@ -30,6 +38,18 @@ export class ProfilesService {
     }
 
     const eligibility = calculateDonorEligibility(profile.last_donor);
+
+    const [completedRequests, user] = await Promise.all([
+      this.requestModel
+        .where('user_Profiles_id', profile._id)
+        .where('status', 'done')
+        .get(),
+      this.userModel.where('_id', profile.user_id).first(),
+    ]);
+
+    const memberSinceYear = user?.created_at
+      ? user.created_at.getUTCFullYear()
+      : null;
 
     return {
       success: true,
@@ -48,6 +68,10 @@ export class ProfilesService {
           is_eligible: eligibility.isEligible,
           remaining_days: eligibility.remainingDays,
           eligible_at: eligibility.eligibleAt,
+        },
+        stats: {
+          total_donations: completedRequests.length,
+          member_since_year: memberSinceYear,
         },
       },
     };
