@@ -12,8 +12,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { QrCode } from "lucide-react-native";
 import { applicantsForBlood, confirmRequest } from "../../src/api/requests";
+import { getBlood } from "../../src/api/bloods";
 import { errorMessage } from "../../src/lib/errorMessage";
+
+type ApplicantStatus = "registered" | "confirmed" | "done";
 
 type Applicant = {
   id: string;
@@ -22,68 +26,89 @@ type Applicant = {
     blood_type: string;
     rhesus: string;
   } | null;
-  status: "registered" | "confirmed" | "done";
-  qr_token: string;
+  status: ApplicantStatus;
+  qr_token?: string;
 };
 
-const FILTERS = [
-  { key: "all", label: "Semua" },
-  { key: "registered", label: "Terdaftar" },
-  { key: "confirmed", label: "Dikonfirmasi" },
-  { key: "done", label: "Selesai" },
+type BloodContext = {
+  id: string;
+  title?: string | null;
+  blood_type: string;
+  rhesus: string;
+  quantity: number;
+};
+
+const FILTERS: {
+  key: "all" | ApplicantStatus;
+  label: string;
+}[] = [
+  {
+    key: "all",
+    label: "Semua",
+  },
+  {
+    key: "registered",
+    label: "Terdaftar",
+  },
+  {
+    key: "confirmed",
+    label: "Dikonfirmasi",
+  },
+  {
+    key: "done",
+    label: "Selesai",
+  },
 ];
 
-function StatusBadge({ status }: { status: Applicant["status"] }) {
-  const map = {
-    registered: {
-      t: "Terdaftar",
-      c: "bg-ground",
-      f: "text-ink-muted",
-    },
-    confirmed: {
-      t: "Dikonfirmasi",
-      c: "bg-ink",
-      f: "text-white",
-    },
-    done: {
-      t: "Selesai",
-      c: "border border-line",
-      f: "text-ink",
-    },
-  }[status];
-
-  return (
-    <View className={`rounded-pill px-3 py-1 ${map.c}`}>
-      <Text
-        className={`font-archivo-bold text-overline tracking-overline ${map.f}`}
-      >
-        {map.t}
-      </Text>
-    </View>
-  );
-}
-
 export default function Applicants() {
-  const params = useLocalSearchParams<{ bloodId?: string }>();
+  const params = useLocalSearchParams<{
+    bloodId?: string;
+  }>();
+
   const bloodId = params.bloodId ?? "";
+  const queryClient = useQueryClient();
 
-  const qc = useQueryClient();
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
 
-  const [filter, setFilter] = useState("all");
   const [confirming, setConfirming] = useState<string | null>(null);
 
-  const q = useQuery({
+  const applicantQuery = useQuery({
     queryKey: ["applicants", bloodId],
     queryFn: () => applicantsForBlood(bloodId),
-    enabled: !!bloodId,
+    enabled: Boolean(bloodId),
   });
 
-  const all = (q.data ?? []) as unknown as Applicant[];
+  const bloodQuery = useQuery({
+    queryKey: ["facility-blood", bloodId],
+    queryFn: () => getBlood(bloodId),
+    enabled: Boolean(bloodId),
+  });
 
-  const list =
+  const blood = bloodQuery.data as BloodContext | undefined;
+  const applicants = (applicantQuery.data ?? []) as Applicant[];
+
+  const filteredApplicants =
     filter === "all"
-      ? all
-      : all.filter((applicant) => applicant.status === filter);
+      ? applicants
+      : applicants.filter((applicant) => applicant.status === filter);
+
+  const registeredCount = applicants.filter(
+    (applicant) => applicant.status === "registered",
+  ).length;
+
+  const confirmedCount = applicants.filter(
+    (applicant) => applicant.status === "confirmed",
+  ).length;
+
+  const doneCount = applicants.filter(
+    (applicant) => applicant.status === "done",
+  ).length;
+
+  const refreshing = applicantQuery.isFetching || bloodQuery.isFetching;
+
+  async function onRefresh() {
+    await Promise.all([applicantQuery.refetch(), bloodQuery.refetch()]);
+  }
 
   async function onConfirm(id: string) {
     setConfirming(id);
@@ -91,11 +116,16 @@ export default function Applicants() {
     try {
       await confirmRequest(id);
 
-      await qc.invalidateQueries({
-        queryKey: ["applicants", bloodId],
-      });
-    } catch (e: any) {
-      Alert.alert("Gagal konfirmasi", errorMessage(e, "Coba lagi."));
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["applicants", bloodId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["facility-bloods"],
+        }),
+      ]);
+    } catch (error: any) {
+      Alert.alert("Gagal konfirmasi", errorMessage(error, "Coba lagi."));
     } finally {
       setConfirming(null);
     }
@@ -119,22 +149,47 @@ export default function Applicants() {
               </Pressable>
             ) : null}
 
-            <Text className="font-archivo-bold text-subjudul text-ink">
-              Pendaftar
-            </Text>
+            <View className="flex-1">
+              <Text
+                className="font-archivo-bold text-subjudul text-ink"
+                numberOfLines={1}
+              >
+                {blood?.title || "Pendaftar"}
+              </Text>
+
+              {blood ? (
+                <Text className="mt-0.5 font-archivo text-caption text-ink-muted">
+                  {blood.blood_type}
+                  {blood.rhesus} · {blood.quantity} kantong
+                </Text>
+              ) : null}
+            </View>
           </View>
 
-          {/* Filter cuma muncul kalau sudah pilih kebutuhan */}
+          {bloodId && applicants.length > 0 ? (
+            <View className="flex-row gap-2 mt-3">
+              <Summary value={registeredCount} label="Terdaftar" />
+
+              <Summary value={confirmedCount} label="Konfirmasi" accent />
+
+              <Summary value={doneCount} label="Selesai" />
+            </View>
+          ) : null}
+
           {bloodId ? (
-            <View className="flex-row gap-2 mt-2">
-              {FILTERS.map((fl) => {
-                const active = fl.key === filter;
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerClassName="gap-2 mt-4"
+            >
+              {FILTERS.map((item) => {
+                const active = item.key === filter;
 
                 return (
                   <Pressable
-                    key={fl.key}
-                    onPress={() => setFilter(fl.key)}
-                    className={`rounded-pill border px-3 py-2 ${
+                    key={item.key}
+                    onPress={() => setFilter(item.key)}
+                    className={`rounded-pill border px-4 py-2 ${
                       active
                         ? "border-primary bg-primary"
                         : "border-line bg-surface"
@@ -145,12 +200,12 @@ export default function Applicants() {
                         active ? "text-white" : "text-ink"
                       }`}
                     >
-                      {fl.label}
+                      {item.label}
                     </Text>
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
           ) : null}
         </View>
 
@@ -158,14 +213,10 @@ export default function Applicants() {
           contentContainerClassName="px-6 pt-4 pb-10"
           refreshControl={
             bloodId ? (
-              <RefreshControl
-                refreshing={q.isFetching}
-                onRefresh={() => q.refetch()}
-              />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             ) : undefined
           }
         >
-          {/* Belum pilih kebutuhan dari Dashboard */}
           {!bloodId ? (
             <View className="rounded-[18px] border border-line bg-surface p-5">
               <Text className="font-archivo-bold text-body text-ink">
@@ -173,26 +224,47 @@ export default function Applicants() {
               </Text>
 
               <Text className="mt-1 leading-5 font-archivo text-caption text-ink-muted">
-                Pilih salah satu kebutuhan aktif dari Dashboard untuk melihat
-                daftar pendonor yang sudah mendaftar.
+                Pilih kebutuhan aktif dari Dashboard untuk melihat daftar
+                pendonor.
               </Text>
 
               <Pressable
                 onPress={() => router.push("/(facility)")}
-                className="items-center py-3 mt-5 rounded-pill bg-primary active:bg-primary-dark"
+                className="items-center py-3 mt-5 rounded-pill bg-primary"
               >
                 <Text className="text-white font-archivo-bold text-body">
                   Ke Dashboard
                 </Text>
               </Pressable>
             </View>
-          ) : q.isLoading ? (
-            /* Loading */
-            <View className="items-center py-10">
+          ) : applicantQuery.isLoading || bloodQuery.isLoading ? (
+            <View className="items-center py-12">
               <ActivityIndicator color="#EC3013" />
+
+              <Text className="mt-3 font-archivo text-caption text-ink-muted">
+                Memuat pendaftar...
+              </Text>
             </View>
-          ) : list.length === 0 ? (
-            /* Empty */
+          ) : applicantQuery.isError || bloodQuery.isError ? (
+            <View className="rounded-[18px] border border-line bg-surface p-5">
+              <Text className="font-archivo-bold text-body text-ink">
+                Pendaftar belum dapat dimuat
+              </Text>
+
+              <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                Periksa koneksi lalu coba lagi.
+              </Text>
+
+              <Pressable
+                onPress={onRefresh}
+                className="items-center py-3 mt-4 rounded-pill bg-primary"
+              >
+                <Text className="text-white font-archivo-bold text-body">
+                  Coba lagi
+                </Text>
+              </Pressable>
+            </View>
+          ) : filteredApplicants.length === 0 ? (
             <View className="rounded-[18px] border border-line bg-surface p-5">
               <Text className="font-archivo-bold text-body text-ink">
                 Belum ada pendaftar
@@ -200,64 +272,163 @@ export default function Applicants() {
 
               <Text className="mt-1 font-archivo text-caption text-ink-muted">
                 {filter === "all"
-                  ? "Belum ada yang mendaftar ke kebutuhan ini."
+                  ? "Belum ada pendonor yang mendaftar."
                   : "Tidak ada pendaftar pada status ini."}
               </Text>
             </View>
           ) : (
-            /* List */
             <View className="gap-3">
-              {list.map((a) => (
-                <View
-                  key={a.id}
-                  className="rounded-[18px] border border-line bg-surface p-4"
-                >
-                  <View className="flex-row items-center">
-                    {/* Avatar */}
-                    <View className="items-center justify-center mr-3 h-11 w-11 rounded-card bg-primary-soft">
-                      <Text className="font-archivo-black text-body text-primary-dark">
-                        {(a.donor?.name?.[0] ?? "?").toUpperCase()}
-                      </Text>
-                    </View>
-
-                    {/* Donor */}
-                    <View className="flex-1">
-                      <Text className="font-archivo-bold text-body text-ink">
-                        {a.donor?.name ?? "Pendonor"}
-                      </Text>
-
-                      <Text className="mt-0.5 font-archivo text-caption text-ink-muted">
-                        {a.donor
-                          ? `${a.donor.blood_type}${a.donor.rhesus}`
-                          : "-"}
-                      </Text>
-                    </View>
-
-                    <StatusBadge status={a.status} />
-                  </View>
-
-                  {/* Confirm */}
-                  {a.status === "registered" && (
-                    <Pressable
-                      onPress={() => onConfirm(a.id)}
-                      disabled={confirming === a.id}
-                      className="items-center py-3 mt-4 rounded-pill bg-primary active:bg-primary-dark"
-                    >
-                      {confirming === a.id ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Text className="text-white font-archivo-bold text-body">
-                          Konfirmasi
-                        </Text>
-                      )}
-                    </Pressable>
-                  )}
-                </View>
+              {filteredApplicants.map((applicant) => (
+                <ApplicantCard
+                  key={applicant.id}
+                  applicant={applicant}
+                  confirming={confirming === applicant.id}
+                  onConfirm={() => onConfirm(applicant.id)}
+                />
               ))}
             </View>
           )}
         </ScrollView>
       </SafeAreaView>
+    </View>
+  );
+}
+
+function ApplicantCard({
+  applicant,
+  confirming,
+  onConfirm,
+}: {
+  applicant: Applicant;
+  confirming: boolean;
+  onConfirm: () => void;
+}) {
+  return (
+    <View className="rounded-[18px] border border-line bg-surface p-4">
+      <View className="flex-row items-center">
+        <View className="items-center justify-center mr-3 h-11 w-11 rounded-card bg-primary-soft">
+          <Text className="font-archivo-black text-body text-primary-dark">
+            {(applicant.donor?.name?.[0] ?? "?").toUpperCase()}
+          </Text>
+        </View>
+
+        <View className="flex-1">
+          <Text className="font-archivo-bold text-body text-ink">
+            {applicant.donor?.name ?? "Pendonor"}
+          </Text>
+
+          <Text className="mt-0.5 font-archivo text-caption text-ink-muted">
+            {applicant.donor
+              ? `${applicant.donor.blood_type}${applicant.donor.rhesus}`
+              : "-"}
+          </Text>
+        </View>
+
+        <View className="items-end">
+          <QrCode
+            color={applicant.status === "confirmed" ? "#EC3013" : "#605D5D"}
+            size={22}
+          />
+
+          <View className="mt-2">
+            <StatusBadge status={applicant.status} />
+          </View>
+        </View>
+      </View>
+
+      {applicant.status === "registered" ? (
+        <Pressable
+          onPress={onConfirm}
+          disabled={confirming}
+          className="items-center py-3 mt-4 rounded-pill bg-primary active:bg-primary-dark"
+        >
+          {confirming ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text className="text-white font-archivo-bold text-body">
+              Konfirmasi
+            </Text>
+          )}
+        </Pressable>
+      ) : null}
+
+      {applicant.status === "confirmed" ? (
+        <Pressable
+          onPress={() => router.push("/(facility)/scan")}
+          className="flex-row items-center justify-center py-3 mt-4 border rounded-pill border-primary active:bg-primary-soft"
+        >
+          <QrCode color="#A31B0A" size={18} />
+
+          <Text className="ml-2 font-archivo-bold text-body text-primary-dark">
+            Scan QR untuk selesaikan
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function StatusBadge({ status }: { status: ApplicantStatus }) {
+  const styles = {
+    registered: {
+      label: "Terdaftar",
+      container: "bg-ground",
+      text: "text-ink-muted",
+    },
+    confirmed: {
+      label: "Dikonfirmasi",
+      container: "bg-primary-soft",
+      text: "text-primary-dark",
+    },
+    done: {
+      label: "Selesai",
+      container: "bg-ink",
+      text: "text-white",
+    },
+  }[status];
+
+  return (
+    <View className={`rounded-pill px-3 py-1 ${styles.container}`}>
+      <Text
+        className={`font-archivo-bold text-overline tracking-overline ${styles.text}`}
+      >
+        {styles.label}
+      </Text>
+    </View>
+  );
+}
+
+function Summary({
+  value,
+  label,
+  accent = false,
+}: {
+  value: number;
+  label: string;
+  accent?: boolean;
+}) {
+  return (
+    <View
+      className={`flex-1 rounded-card border p-3 ${
+        accent ? "border-primary bg-primary-soft" : "border-line bg-surface"
+      }`}
+    >
+      <Text
+        className={`font-archivo-black text-subjudul ${
+          accent ? "text-primary-dark" : "text-ink"
+        }`}
+      >
+        {value}
+      </Text>
+
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        className="mt-1 font-archivo text-caption text-ink-muted"
+      >
+        {label}
+      </Text>
     </View>
   );
 }
