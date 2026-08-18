@@ -169,6 +169,9 @@ export class DemoSeedService {
       },
       status: 'registered' as const,
       qr_token: randomUUID(),
+      code: 'VF-8241',
+      checked_in_at: null,
+      volume_ml: null,
     };
 
     if (donorRequest) {
@@ -203,6 +206,7 @@ export class DemoSeedService {
         blood_id: blood._id.toString(),
         request_id: donorRequest._id.toString(),
         qr_token: requestData.qr_token,
+        code: requestData.code,
         request_status: requestData.status,
       },
     };
