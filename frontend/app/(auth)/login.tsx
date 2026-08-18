@@ -12,6 +12,7 @@ import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useAuth } from "../../src/store/auth";
 import { errorMessage } from "../../src/lib/errorMessage";
+import { registerPushTokenForCurrentDevice } from "../../src/lib/pushNotifications";
 
 export default function Login() {
   const login = useAuth((s) => s.login);
@@ -23,17 +24,27 @@ export default function Login() {
   async function onSubmit() {
     if (!email || !password) {
       Alert.alert("Lengkapi data", "Isi email dan kata sandi dulu.");
+
       return;
     }
+
     setLoading(true);
+
     try {
       await login(email.trim(), password);
-      const role = useAuth.getState().user?.role;
-      router.replace(role === "facility" ? "/(facility)" : "/(donor)");
-    } catch (e: any) {
+
+      const user = useAuth.getState().user;
+
+      // Endpoint push token hanya untuk role donor.
+      if (user?.role === "donor") {
+        await registerPushTokenForCurrentDevice();
+      }
+
+      router.replace(user?.role === "facility" ? "/(facility)" : "/(donor)");
+    } catch (error: any) {
       Alert.alert(
         "Login gagal",
-        errorMessage(e, "Periksa email/sandi atau koneksi backend."),
+        errorMessage(error, "Periksa email/sandi atau koneksi backend."),
       );
     } finally {
       setLoading(false);
