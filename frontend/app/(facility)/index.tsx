@@ -5,7 +5,6 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -13,81 +12,175 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../src/store/auth";
 import { listBloods } from "../../src/api/bloods";
+import { getMyHospital } from "../../src/api/hospitals";
 
-type Blood = {
+type FacilityBlood = {
   id: string;
   blood_type: string;
   rhesus: string;
   quantity: number;
   status_blood: "normal" | "urgent" | "closed";
   schedule: string;
+  schedule_end?: string | null;
+  title?: string | null;
+  component?: string | null;
+  applicants_count?: number;
+  collected?: number;
 };
 
 const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
-const BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 
-function formatSchedule(iso: string) {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "-";
-  const jam = `${String(d.getHours()).padStart(2, "0")}.${String(
-    d.getMinutes(),
+const BULAN = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
+
+const COMPONENT_LABELS: Record<string, string> = {
+  whole_blood: "Whole blood",
+  plasma: "Plasma",
+  trombosit: "Trombosit",
+  eritrosit: "Eritrosit",
+};
+
+function formatSchedule(startValue: string, endValue?: string | null) {
+  const start = new Date(startValue);
+
+  if (Number.isNaN(start.getTime())) {
+    return "-";
+  }
+
+  const startTime = `${String(start.getHours()).padStart(2, "0")}.${String(
+    start.getMinutes(),
   ).padStart(2, "0")}`;
-  return `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN[d.getMonth()]} · ${jam}`;
+
+  const date = `${HARI[start.getDay()]}, ${start.getDate()} ${
+    BULAN[start.getMonth()]
+  }`;
+
+  if (!endValue) {
+    return `${date} · ${startTime}`;
+  }
+
+  const end = new Date(endValue);
+
+  if (Number.isNaN(end.getTime())) {
+    return `${date} · ${startTime}`;
+  }
+
+  const endTime = `${String(end.getHours()).padStart(2, "0")}.${String(
+    end.getMinutes(),
+  ).padStart(2, "0")}`;
+
+  return `${date} · ${startTime}–${endTime}`;
 }
 
 export default function FacilityDashboard() {
-  const user = useAuth((s) => s.user);
-  const logout = useAuth((s) => s.logout);
+  const user = useAuth((state) => state.user);
+  const logout = useAuth((state) => state.logout);
 
-  const q = useQuery({
+  const bloodQuery = useQuery({
     queryKey: ["facility-bloods"],
-    queryFn: listBloods,
+    queryFn: () => listBloods(),
   });
 
-  const bloods = ((q.data ?? []) as unknown as Blood[]);
-  const aktif = bloods.filter((b) => b.status_blood !== "closed");
-  const mendesak = bloods.filter((b) => b.status_blood === "urgent").length;
-  const selesai = bloods.filter((b) => b.status_blood === "closed").length;
+  const hospitalQuery = useQuery({
+    queryKey: ["my-hospital"],
+    queryFn: () => getMyHospital(),
+  });
+
+  const bloods = (bloodQuery.data ?? []) as FacilityBlood[];
+
+  const activeBloods = bloods.filter(
+    (blood) => blood.status_blood !== "closed",
+  );
+
+  const totalCollected = bloods.reduce(
+    (total, blood) => total + (blood.collected ?? 0),
+    0,
+  );
+
+  const doneCount = hospitalQuery.data?.stats.total_collected ?? 0;
+
+  const confirmedCount = Math.max(0, totalCollected - doneCount);
+
+  const refreshing = bloodQuery.isFetching || hospitalQuery.isFetching;
+
+  async function onRefresh() {
+    await Promise.all([bloodQuery.refetch(), hospitalQuery.refetch()]);
+  }
 
   async function onLogout() {
     await logout();
     router.replace("/(auth)/login");
   }
 
-  const onCreate = () => router.push("/(facility)/create");
-  const onManage = (bloodId: string) =>
-    router.push({ pathname: "/(facility)/applicants", params: { bloodId } });
+  function onManage(bloodId: string) {
+    router.push({
+      pathname: "/(facility)/applicants",
+      params: {
+        bloodId,
+      },
+    });
+  }
 
   return (
     <View className="flex-1 bg-ground">
       <StatusBar style="dark" />
+
       <SafeAreaView className="flex-1">
         <ScrollView
           contentContainerClassName="px-6 pb-10"
           refreshControl={
-            <RefreshControl refreshing={q.isFetching} onRefresh={() => q.refetch()} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
           {/* Header */}
-          <View className="mt-2 flex-row items-center justify-between">
-            <View className="flex-1 flex-row items-center">
-              <View className="mr-3 h-12 w-12 items-center justify-center rounded-card bg-primary">
-                <Text className="font-archivo-black text-body text-white">RS</Text>
+          <View className="flex-row items-center justify-between mt-2">
+            <View className="flex-row items-center flex-1">
+              <View className="items-center justify-center w-12 h-12 mr-3 rounded-card bg-primary">
+                <Text className="text-white font-archivo-black text-body">
+                  RS
+                </Text>
               </View>
+
               <View className="flex-1">
                 <Text
                   className="font-archivo-bold text-subjudul text-ink"
                   numberOfLines={1}
                 >
-                  {user?.name ?? "Fasilitas Kesehatan"}
+                  {hospitalQuery.data?.hospital_name ??
+                    user?.name ??
+                    "Fasilitas kesehatan"}
                 </Text>
-                <View className="mt-1 self-start rounded-pill bg-primary-soft px-2 py-0.5">
-                  <Text className="font-archivo-bold text-overline tracking-overline text-primary-dark">
-                    TERVERIFIKASI
-                  </Text>
+
+                <View className="flex-row items-center mt-1">
+                  <View className="self-start px-2 py-0.5 rounded-pill bg-primary-soft">
+                    <Text className="font-archivo-bold text-overline tracking-overline text-primary-dark">
+                      {hospitalQuery.data?.isVerified === false
+                        ? "BELUM TERVERIFIKASI"
+                        : "TERVERIFIKASI"}
+                    </Text>
+                  </View>
+
+                  {hospitalQuery.data?.code ? (
+                    <Text className="ml-2 font-archivo-semibold text-caption text-ink-muted">
+                      {hospitalQuery.data.code}
+                    </Text>
+                  ) : null}
                 </View>
               </View>
             </View>
+
             <Pressable onPress={onLogout} hitSlop={8} className="ml-2">
               <Text className="font-archivo-semibold text-caption text-ink-muted">
                 Keluar
@@ -95,106 +188,86 @@ export default function FacilityDashboard() {
             </Pressable>
           </View>
 
-          {/* Ringkasan */}
-          {q.isLoading ? (
-            <View className="mt-6 items-center py-10">
+          {bloodQuery.isLoading ? (
+            <View className="items-center py-16 mt-6">
               <ActivityIndicator color="#EC3013" />
+
+              <Text className="mt-3 font-archivo text-caption text-ink-muted">
+                Memuat dashboard...
+              </Text>
             </View>
-          ) : q.isError ? (
+          ) : bloodQuery.isError ? (
             <View className="mt-6 rounded-[18px] border border-line bg-surface p-5">
               <Text className="font-archivo-bold text-body text-ink">
-                Profil faskes belum ada
+                Dashboard belum dapat dimuat
               </Text>
+
               <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                Akun ini belum tertaut ke data rumah sakit, jadi kebutuhan belum bisa
-                ditampilkan. (Perlu seed hospital di backend.)
+                Periksa koneksi lalu coba lagi.
               </Text>
+
+              <Pressable
+                onPress={() => bloodQuery.refetch()}
+                className="items-center py-3 mt-4 rounded-pill bg-primary"
+              >
+                <Text className="text-white font-archivo-bold text-body">
+                  Coba lagi
+                </Text>
+              </Pressable>
             </View>
           ) : (
             <>
-              <View className="mt-6 flex-row gap-3">
-                <Stat n={aktif.length} label="Aktif" />
-                <Stat n={mendesak} label="Mendesak" accent />
-                <Stat n={selesai} label="Selesai" />
+              {/* Ringkasan */}
+              <View className="flex-row gap-3 mt-6">
+                <Stat value={activeBloods.length} label="Aktif" />
+
+                <Stat value={confirmedCount} label="Dikonfirmasi" accent />
+
+                <Stat value={doneCount} label="Selesai" />
               </View>
 
+              {/* Actions */}
               <Pressable
-                onPress={onCreate}
-                className="mt-5 items-center rounded-pill bg-primary py-4 active:bg-primary-dark"
+                onPress={() => router.push("/(facility)/create")}
+                className="items-center py-4 mt-5 rounded-pill bg-primary active:bg-primary-dark"
               >
-                <Text className="font-archivo-bold text-body text-white">
+                <Text className="text-white font-archivo-bold text-body">
                   + Buat kebutuhan darah
                 </Text>
               </Pressable>
 
               <Pressable
                 onPress={() => router.push("/(facility)/scan")}
-                className="mt-3 items-center rounded-pill border border-line py-4 active:bg-surface"
+                className="items-center py-4 mt-3 border rounded-pill border-line bg-surface active:bg-ground"
               >
                 <Text className="font-archivo-semibold text-body text-ink">
                   Scan QR check-in
                 </Text>
               </Pressable>
 
+              {/* Active requests */}
               <Text className="mb-3 mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
                 KEBUTUHAN AKTIF
               </Text>
 
-              {aktif.length === 0 ? (
+              {activeBloods.length === 0 ? (
                 <View className="rounded-[18px] border border-line bg-surface p-5">
                   <Text className="font-archivo-bold text-body text-ink">
                     Belum ada kebutuhan aktif
                   </Text>
+
                   <Text className="mt-1 font-archivo text-caption text-ink-muted">
                     Buat kebutuhan pertamamu lewat tombol di atas.
                   </Text>
                 </View>
               ) : (
                 <View className="gap-3">
-                  {aktif.map((b) => (
-                    <Pressable
-                      key={b.id}
-                      onPress={() => onManage(b.id)}
-                      className="rounded-[18px] border border-line bg-surface p-4 active:bg-ground"
-                    >
-                      <View className="flex-row items-center justify-between">
-                        <View
-                          className={`rounded-pill px-3 py-1 ${
-                            b.status_blood === "urgent"
-                              ? "bg-primary"
-                              : "bg-ground"
-                          }`}
-                        >
-                          <Text
-                            className={`font-archivo-bold text-overline tracking-overline ${
-                              b.status_blood === "urgent"
-                                ? "text-white"
-                                : "text-ink-muted"
-                            }`}
-                          >
-                            {b.status_blood === "urgent" ? "MENDESAK" : "RUTIN"}
-                          </Text>
-                        </View>
-                        <View className="rounded-pill bg-primary-soft px-3 py-1">
-                          <Text className="font-archivo-bold text-caption text-primary-dark">
-                            {b.blood_type}
-                            {b.rhesus}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Text className="mt-3 font-archivo text-caption text-ink-muted">
-                        {formatSchedule(b.schedule)}
-                      </Text>
-                      <View className="mt-1 flex-row items-center justify-between">
-                        <Text className="font-archivo-semibold text-body text-ink">
-                          {b.quantity} kantong dibutuhkan
-                        </Text>
-                        <Text className="font-archivo-bold text-caption text-primary-dark">
-                          Kelola →
-                        </Text>
-                      </View>
-                    </Pressable>
+                  {activeBloods.map((blood) => (
+                    <BloodCard
+                      key={blood.id}
+                      blood={blood}
+                      onPress={() => onManage(blood.id)}
+                    />
                   ))}
                 </View>
               )}
@@ -206,12 +279,99 @@ export default function FacilityDashboard() {
   );
 }
 
-function Stat({
-  n,
-  label,
-  accent,
+function BloodCard({
+  blood,
+  onPress,
 }: {
-  n: number;
+  blood: FacilityBlood;
+  onPress: () => void;
+}) {
+  const applicants = blood.applicants_count ?? 0;
+  const collected = blood.collected ?? 0;
+
+  const percentage =
+    blood.quantity <= 0
+      ? 0
+      : Math.min(100, Math.round((collected / blood.quantity) * 100));
+
+  const component = blood.component
+    ? (COMPONENT_LABELS[blood.component] ?? blood.component)
+    : null;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      className="rounded-[18px] border border-line bg-surface p-4 active:bg-ground"
+    >
+      <View className="flex-row items-center justify-between">
+        <View
+          className={`rounded-pill px-3 py-1 ${
+            blood.status_blood === "urgent" ? "bg-primary" : "bg-ground"
+          }`}
+        >
+          <Text
+            className={`font-archivo-bold text-overline tracking-overline ${
+              blood.status_blood === "urgent" ? "text-white" : "text-ink-muted"
+            }`}
+          >
+            {blood.status_blood === "urgent" ? "MENDESAK" : "RUTIN"}
+          </Text>
+        </View>
+
+        <View className="px-3 py-1 rounded-pill bg-primary-soft">
+          <Text className="font-archivo-bold text-caption text-primary-dark">
+            {blood.blood_type}
+            {blood.rhesus}
+          </Text>
+        </View>
+      </View>
+
+      <Text className="mt-3 font-archivo-bold text-body text-ink">
+        {blood.title || "Kebutuhan darah"}
+      </Text>
+
+      {component ? (
+        <Text className="mt-1 font-archivo text-caption text-ink-muted">
+          {component}
+        </Text>
+      ) : null}
+
+      <Text className="mt-2 font-archivo text-caption text-ink-muted">
+        {formatSchedule(blood.schedule, blood.schedule_end)}
+      </Text>
+
+      <Text className="mt-3 font-archivo-semibold text-caption text-ink">
+        {applicants} pendaftar · {collected} dari {blood.quantity} kantong
+      </Text>
+
+      <View className="h-2 mt-2 overflow-hidden rounded-pill bg-ground">
+        <View
+          className="h-full rounded-pill bg-primary"
+          style={{
+            width: `${percentage}%`,
+          }}
+        />
+      </View>
+
+      <View className="flex-row items-center justify-between mt-3">
+        <Text className="font-archivo text-caption text-ink-muted">
+          {percentage}% terkumpul
+        </Text>
+
+        <Text className="font-archivo-bold text-caption text-primary-dark">
+          Kelola →
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function Stat({
+  value,
+  label,
+  accent = false,
+}: {
+  value: number;
   label: string;
   accent?: boolean;
 }) {
@@ -226,9 +386,17 @@ function Stat({
           accent ? "text-primary-dark" : "text-ink"
         }`}
       >
-        {n}
+        {value}
       </Text>
-      <Text className="mt-1 font-archivo text-caption text-ink-muted">{label}</Text>
+
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        className="mt-1 font-archivo text-caption text-ink-muted"
+      >
+        {label}
+      </Text>
     </View>
   );
 }
