@@ -4,6 +4,8 @@ import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import { MapPin, Navigation } from "lucide-react-native";
 import MapView, { Marker } from "react-native-maps";
+import { useQuery } from "@tanstack/react-query";
+import { getMyProfile } from "../../src/api/profiles";
 
 type Detail = {
   id: string;
@@ -13,7 +15,7 @@ type Detail = {
   status_blood: "normal" | "urgent" | "closed";
   schedule: string;
   schedule_end?: string | null;
-  distanceKm: number | null;
+  distanceKm?: number | null;
   title?: string | null;
   note?: string | null;
   component?: string | null;
@@ -91,18 +93,72 @@ function formatSchedule(startValue: string, endValue?: string | null) {
   return `${dateText} · ${startTime}–${endTime}`;
 }
 
+function parseDetail(value?: string): Detail | null {
+  if (!value) return null;
+
+  try {
+    return JSON.parse(value) as Detail;
+  } catch {
+    return null;
+  }
+}
+
+function calculateDistanceKm(from: [number, number], to: [number, number]) {
+  const [fromLongitude, fromLatitude] = from;
+  const [toLongitude, toLatitude] = to;
+
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+
+  const latitudeDifference = toRadians(toLatitude - fromLatitude);
+
+  const longitudeDifference = toRadians(toLongitude - fromLongitude);
+
+  const firstLatitude = toRadians(fromLatitude);
+  const secondLatitude = toRadians(toLatitude);
+
+  const a =
+    Math.sin(latitudeDifference / 2) ** 2 +
+    Math.cos(firstLatitude) *
+      Math.cos(secondLatitude) *
+      Math.sin(longitudeDifference / 2) ** 2;
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return 6371 * c;
+}
+
+function estimateTravelTime(distanceKm?: number | null) {
+  if (typeof distanceKm !== "number" || !Number.isFinite(distanceKm)) {
+    return null;
+  }
+
+  // Estimasi kendaraan dengan kecepatan rata-rata 25 km/jam.
+  const minutes = Math.max(5, Math.round((distanceKm / 25) * 60));
+
+  if (minutes < 60) {
+    return `±${minutes} menit`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  return remainingMinutes > 0
+    ? `±${hours} jam ${remainingMinutes} menit`
+    : `±${hours} jam`;
+}
+
 export default function BloodDetail() {
   const params = useLocalSearchParams<{
     data?: string;
   }>();
 
-  let detail: Detail | null = null;
+  const detail = parseDetail(params.data);
 
-  try {
-    detail = params.data ? (JSON.parse(params.data) as Detail) : null;
-  } catch {
-    detail = null;
-  }
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: getMyProfile,
+    enabled: Boolean(detail),
+  });
 
   if (!detail) {
     return (
@@ -125,6 +181,8 @@ export default function BloodDetail() {
 
   const urgent = detail.status_blood === "urgent";
 
+  const hospitalName = detail.hospital?.hospital_name ?? "Fasilitas kesehatan";
+
   const coordinates = detail.hospital?.location?.coordinates;
 
   const longitude = coordinates?.[0];
@@ -133,6 +191,26 @@ export default function BloodDetail() {
 
   const hasCoordinates =
     typeof latitude === "number" && typeof longitude === "number";
+
+  const donorCoordinates = profileQuery.data?.location?.coordinates;
+
+  const calculatedDistance =
+    typeof latitude === "number" &&
+    typeof longitude === "number" &&
+    Array.isArray(donorCoordinates) &&
+    donorCoordinates.length === 2
+      ? calculateDistanceKm(donorCoordinates as [number, number], [
+          longitude,
+          latitude,
+        ])
+      : null;
+
+  const displayedDistanceKm =
+    typeof detail.distanceKm === "number"
+      ? detail.distanceKm
+      : calculatedDistance;
+
+  const travelTime = estimateTravelTime(displayedDistanceKm);
 
   const component = detail.component
     ? (COMPONENT_LABELS[detail.component] ?? detail.component)
@@ -163,14 +241,9 @@ export default function BloodDetail() {
       return;
     }
 
-    const label = encodeURIComponent(
-      detail.hospital?.hospital_name ?? "Fasilitas kesehatan",
-    );
-
     const url =
       `https://www.google.com/maps/search/?api=1` +
-      `&query=${latitude},${longitude}` +
-      `&query_place_id=${label}`;
+      `&query=${latitude},${longitude}`;
 
     await Linking.openURL(url);
   }
@@ -239,10 +312,15 @@ export default function BloodDetail() {
             </View>
           ) : null}
 
-          {detail.distanceKm !== null ? (
-            <Text className="mt-2 font-archivo-semibold text-caption text-primary-dark">
-              {detail.distanceKm.toFixed(1)} km dari lokasimu
-            </Text>
+          {typeof displayedDistanceKm === "number" ? (
+            <View className="flex-row items-center mt-3">
+              <Navigation color="#A31B0A" size={17} />
+
+              <Text className="ml-2 font-archivo-semibold text-caption text-primary-dark">
+                {displayedDistanceKm.toFixed(1)} km dari lokasimu
+                {travelTime ? ` · ETA ${travelTime}` : ""}
+              </Text>
+            </View>
           ) : null}
 
           {/* Information */}
