@@ -44,15 +44,15 @@ export default function Login() {
     <View className="flex-1 bg-surface">
       <StatusBar style="dark" />
       <SafeAreaView className="flex-1 px-6">
-        <View className="flex-1 justify-center">
-          <View className="mb-6 h-12 w-12 items-center justify-center rounded-card bg-primary">
-            <Text className="font-archivo-black text-xl text-white">V</Text>
+        <View className="justify-center flex-1">
+          <View className="items-center justify-center w-12 h-12 mb-6 rounded-card bg-primary">
+            <Text className="text-xl text-white font-archivo-black">V</Text>
           </View>
 
-          <Text className="font-archivo-bold text-judul leading-tight text-ink">
+          <Text className="leading-tight font-archivo-bold text-judul text-ink">
             Selamat datang{"\n"}kembali
           </Text>
-          <Text className="mb-8 mt-2 font-archivo text-body text-ink-muted">
+          <Text className="mt-2 mb-8 font-archivo text-body text-ink-muted">
             Masuk untuk melihat kebutuhan darah di sekitarmu.
           </Text>
 
@@ -72,7 +72,7 @@ export default function Login() {
           <Text className="mb-2 font-archivo-medium text-caption text-ink">
             Kata sandi
           </Text>
-          <View className="flex-row items-center rounded-card border border-line px-4">
+          <View className="flex-row items-center px-4 border rounded-card border-line">
             <TextInput
               value={password}
               onChangeText={setPassword}
@@ -90,7 +90,7 @@ export default function Login() {
 
           <Pressable
             onPress={() => Alert.alert("Lupa kata sandi", "Fitur menyusul.")}
-            className="mb-6 mt-3 self-end"
+            className="self-end mt-3 mb-6"
             hitSlop={8}
           >
             <Text className="font-archivo-semibold text-caption text-primary-dark">
@@ -101,16 +101,18 @@ export default function Login() {
           <Pressable
             onPress={onSubmit}
             disabled={loading}
-            className="items-center rounded-pill bg-primary py-4 active:bg-primary-dark"
+            className="items-center py-4 rounded-pill bg-primary active:bg-primary-dark"
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text className="font-archivo-bold text-body text-white">Masuk</Text>
+              <Text className="text-white font-archivo-bold text-body">
+                Masuk
+              </Text>
             )}
           </Pressable>
 
-          <View className="my-6 flex-row items-center">
+          <View className="flex-row items-center my-6">
             <View className="h-[1px] flex-1 bg-line" />
             <Text className="mx-4 font-archivo-medium text-overline tracking-overline text-ink-muted">
               ATAU
@@ -120,34 +122,23 @@ export default function Login() {
 
           <Pressable
             onPress={() => Alert.alert("Google", "Login Google menyusul.")}
-            className="items-center justify-center rounded-pill border border-line py-4"
+            className="items-center justify-center py-4 border rounded-pill border-line"
           >
             <Text className="font-archivo-semibold text-body text-ink">
               Lanjut dengan Google
             </Text>
           </Pressable>
 
-          <View className="mt-6 flex-row justify-center">
+          <View className="flex-row justify-center mt-6">
             <Text className="font-archivo text-body text-ink-muted">
               Belum punya akun?{" "}
             </Text>
-            <Pressable onPress={() => router.push("/(auth)/register")} hitSlop={8}>
+            <Pressable
+              onPress={() => router.push("/(auth)/register")}
+              hitSlop={8}
+            >
               <Text className="font-archivo-bold text-body text-primary-dark">
                 Daftar
-              </Text>
-            </Pressable>
-          </View>
-
-          {/* DEV — pratinjau layar tanpa backend. Hapus sebelum demo. */}
-          <View className="mt-4 flex-row justify-center gap-6">
-            <Pressable onPress={() => router.replace("/(donor)/profile")} hitSlop={8}>
-              <Text className="font-archivo-medium text-caption text-ink-muted">
-                DEV · Donor
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => router.replace("/(facility)")} hitSlop={8}>
-              <Text className="font-archivo-medium text-caption text-ink-muted">
-                DEV · Faskes
               </Text>
             </Pressable>
           </View>
