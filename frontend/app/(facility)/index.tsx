@@ -127,6 +127,15 @@ export default function FacilityDashboard() {
                 </Text>
               </Pressable>
 
+              <Pressable
+                onPress={() => router.push("/(facility)/scan")}
+                className="mt-3 items-center rounded-pill border border-line py-4 active:bg-surface"
+              >
+                <Text className="font-archivo-semibold text-body text-ink">
+                  Scan QR check-in
+                </Text>
+              </Pressable>
+
               <Text className="mb-3 mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
                 KEBUTUHAN AKTIF
               </Text>
