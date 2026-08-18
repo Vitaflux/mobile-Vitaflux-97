@@ -2,6 +2,7 @@ import { View, Text, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
+import QRCode from "react-native-qrcode-svg";
 
 const STEPS = [
   { key: "registered", label: "Terdaftar", desc: "Pendaftaranmu diterima." },
@@ -134,7 +135,23 @@ export default function Status() {
             })}
           </View>
 
-          <Text className="mt-6 text-center font-archivo text-caption text-ink-muted">
+          {/* QR check-in (D-10) */}
+          <Text className="mb-3 mt-4 font-archivo-bold text-overline tracking-overline text-ink-muted">
+            QR CHECK-IN
+          </Text>
+          <View className="items-center rounded-[18px] border border-line bg-surface p-6">
+            <QRCode
+              value={req.qr_token}
+              size={200}
+              color="#201E1D"
+              backgroundColor="#FFFFFF"
+            />
+            <Text className="mt-4 text-center font-archivo text-caption text-ink-muted">
+              Tunjukkan QR ini ke petugas faskes untuk check-in.
+            </Text>
+          </View>
+
+          <Text className="mt-4 text-center font-archivo text-caption text-ink-muted">
             Status diperbarui saat petugas mengonfirmasi atau memindai QR-mu.
           </Text>
         </ScrollView>
