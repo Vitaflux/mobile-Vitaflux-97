@@ -1,6 +1,11 @@
 import { IMongoloquentSchema, Model } from '@mongoloquent/core';
 import { ObjectId } from 'mongodb';
-import { BloodStatus, BloodType, RhesusType } from '../../common/constants';
+import {
+  BloodStatus,
+  BloodType,
+  RhesusType,
+  BloodComponent,
+} from '../../common/constants';
 import { Hospital } from '../../hospitals/entities/hospital.model';
 import { Request } from '../../requests/entities/request.model';
 
@@ -12,6 +17,11 @@ export interface IBlood extends IMongoloquentSchema {
   status_blood: BloodStatus;
   schedule: Date;
   created_at: Date;
+
+  title?: string | null;
+  note?: string | null;
+  component?: BloodComponent | null;
+  schedule_end?: Date | null;
 }
 
 export class Blood extends Model<IBlood> {
