@@ -16,6 +16,7 @@ import { useAuth } from "../../src/store/auth";
 import { getMyProfile } from "../../src/api/profiles";
 import { matchBloods } from "../../src/api/bloods";
 import { haversineKm } from "../../src/lib/haversine";
+import DonorReminderCard from "../../src/components/DonorReminderCard";
 
 type Match = {
   id: string;
@@ -354,6 +355,8 @@ export default function DonorHome() {
                   </Text>
                 )}
               </View>
+
+              <DonorReminderCard />
 
               {/* Heading */}
               <View className="flex-row items-baseline justify-between mt-7">

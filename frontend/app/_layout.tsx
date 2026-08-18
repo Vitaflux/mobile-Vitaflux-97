@@ -14,6 +14,16 @@ import {
   Archivo_800ExtraBold,
 } from "@expo-google-fonts/archivo";
 import { queryClient } from "../src/lib/queryClient";
+import * as Notifications from "expo-notifications";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 // Tahan splash native sampai font Archivo siap.
 SplashScreen.preventAutoHideAsync();

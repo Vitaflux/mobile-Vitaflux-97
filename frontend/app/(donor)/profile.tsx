@@ -19,6 +19,7 @@ import { useAuth } from "../../src/store/auth";
 import { getMyProfile, updateMyProfile } from "../../src/api/profiles";
 import { errorMessage } from "../../src/lib/errorMessage";
 import type { BloodType, Rhesus } from "../../src/types/models";
+import { Bell } from "lucide-react-native";
 
 const MIN_DAYS = 90;
 
@@ -226,9 +227,14 @@ export default function DonorProfile() {
         notify_radius_km: radiusKm,
       });
 
-      await queryClient.invalidateQueries({
-        queryKey: ["profile"],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["profile"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["my-profile"],
+        }),
+      ]);
 
       Alert.alert("Tersimpan", "Profil berhasil diperbarui.");
     } catch (error: any) {
@@ -532,6 +538,17 @@ export default function DonorProfile() {
                 Simpan profil
               </Text>
             )}
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push("/(donor)/pengingat")}
+            className="flex-row items-center justify-center py-4 mt-3 border rounded-pill border-primary bg-primary-soft"
+          >
+            <Bell color="#A31B0A" size={20} />
+
+            <Text className="ml-2 font-archivo-bold text-body text-primary-dark">
+              Atur pengingat donor
+            </Text>
           </Pressable>
 
           <Pressable
