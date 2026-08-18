@@ -15,6 +15,7 @@ import { User } from '../users/entities/user.model';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { Request } from './entities/request.model';
 import { canTransitionRequestStatus } from './helpers/request-status.helper';
+import type { RequestStatus } from '../common/constants';
 
 @Injectable()
 export class RequestsService {
@@ -277,6 +278,73 @@ export class RequestsService {
         status: 'done',
         qr_token: donorRequest.qr_token,
       },
+    };
+  }
+
+  async findMineForDonor(userId: string, status?: RequestStatus) {
+    if (!ObjectId.isValid(userId)) {
+      throw new UnauthorizedException('Invalid authenticated user');
+    }
+
+    const profile = await this.userProfileModel
+      .where('user_id', new ObjectId(userId))
+      .first();
+
+    if (!profile) {
+      return {
+        success: true,
+        data: [],
+      };
+    }
+
+    const donorRequests = status
+      ? await this.requestModel
+          .where('user_Profiles_id', profile._id)
+          .where('status', status)
+          .get()
+      : await this.requestModel.where('user_Profiles_id', profile._id).get();
+
+    const data = await Promise.all(
+      Array.from(donorRequests).map(async (donorRequest) => {
+        const blood = await this.bloodModel
+          .where('_id', donorRequest.bloods_id)
+          .first();
+
+        const hospital = blood
+          ? await this.hospitalModel.where('_id', blood.hospitals_id).first()
+          : null;
+
+        return {
+          id: donorRequest._id.toString(),
+          code: null,
+          qr_token: donorRequest.qr_token,
+          status: donorRequest.status,
+          checked_in_at: null,
+          blood: blood
+            ? {
+                id: blood._id.toString(),
+                blood_type: blood.blood_type,
+                rhesus: blood.rhesus,
+                quantity: blood.quantity,
+                status_blood: blood.status_blood,
+                schedule: blood.schedule,
+                title: null,
+              }
+            : null,
+          hospital: hospital
+            ? {
+                hospital_name: hospital.hospital_name,
+                address: null,
+                location: hospital.location,
+              }
+            : null,
+        };
+      }),
+    );
+
+    return {
+      success: true,
+      data,
     };
   }
 }
