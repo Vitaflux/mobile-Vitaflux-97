@@ -21,3 +21,12 @@ export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 export const ELIGIBILITY_WINDOW_DAYS = 90;
 
 export const URGENT_PUSH_RADIUS_METERS = 20000;
+
+export const BLOOD_COMPONENTS = [
+  'whole_blood',
+  'plasma',
+  'trombosit',
+  'eritrosit',
+] as const;
+
+export type BloodComponent = (typeof BLOOD_COMPONENTS)[number];

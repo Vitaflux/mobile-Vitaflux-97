@@ -59,6 +59,9 @@ export class BloodsService implements OnModuleInit {
 
     const createdAt = new Date();
     const schedule = new Date(createBloodDto.schedule);
+    const scheduleEnd = createBloodDto.schedule_end
+      ? new Date(createBloodDto.schedule_end)
+      : null;
 
     const blood = await this.bloodModel.insert({
       hospitals_id: hospital._id,
@@ -67,6 +70,10 @@ export class BloodsService implements OnModuleInit {
       quantity: createBloodDto.quantity,
       status_blood: createBloodDto.status_blood,
       schedule,
+      title: createBloodDto.title ?? null,
+      note: createBloodDto.note ?? null,
+      component: createBloodDto.component ?? null,
+      schedule_end: scheduleEnd,
       created_at: createdAt,
     });
 
@@ -106,6 +113,10 @@ export class BloodsService implements OnModuleInit {
         quantity: blood.quantity,
         status_blood: blood.status_blood,
         schedule: blood.schedule,
+        title: blood.title ?? null,
+        note: blood.note ?? null,
+        component: blood.component ?? null,
+        schedule_end: blood.schedule_end ?? null,
         created_at: blood.created_at,
       },
     };
@@ -140,6 +151,10 @@ export class BloodsService implements OnModuleInit {
         quantity: blood.quantity,
         status_blood: blood.status_blood,
         schedule: blood.schedule,
+        title: blood.title ?? null,
+        note: blood.note ?? null,
+        component: blood.component ?? null,
+        schedule_end: blood.schedule_end ?? null,
         created_at: blood.created_at,
       })),
     };
@@ -178,6 +193,10 @@ export class BloodsService implements OnModuleInit {
         quantity: blood.quantity,
         status_blood: blood.status_blood,
         schedule: blood.schedule,
+        title: blood.title ?? null,
+        note: blood.note ?? null,
+        component: blood.component ?? null,
+        schedule_end: blood.schedule_end ?? null,
         created_at: blood.created_at,
       },
     };
@@ -224,6 +243,10 @@ export class BloodsService implements OnModuleInit {
         quantity: blood.quantity,
         status_blood: 'closed',
         schedule: blood.schedule,
+        title: blood.title ?? null,
+        note: blood.note ?? null,
+        component: blood.component ?? null,
+        schedule_end: blood.schedule_end ?? null,
         created_at: blood.created_at,
       },
     };
@@ -320,6 +343,10 @@ export class BloodsService implements OnModuleInit {
           quantity: blood.quantity,
           status_blood: blood.status_blood,
           schedule: blood.schedule,
+          title: blood.title ?? null,
+          note: blood.note ?? null,
+          component: blood.component ?? null,
+          schedule_end: blood.schedule_end ?? null,
           created_at: blood.created_at,
           hospital: hospitalData
             ? {
