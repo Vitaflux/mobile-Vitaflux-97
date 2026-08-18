@@ -329,6 +329,11 @@ export class RequestsService {
     if (!profile) {
       return {
         success: true,
+        summary: {
+          total_donations: 0,
+          lives_helped: 0,
+          total_volume_ml: 0,
+        },
         data: [],
       };
     }
@@ -365,13 +370,13 @@ export class RequestsService {
                 quantity: blood.quantity,
                 status_blood: blood.status_blood,
                 schedule: blood.schedule,
-                title: null,
+                title: blood.title ?? null,
               }
             : null,
           hospital: hospital
             ? {
                 hospital_name: hospital.hospital_name,
-                address: null,
+                address: hospital.address ?? null,
                 location: hospital.location,
               }
             : null,
@@ -379,8 +384,30 @@ export class RequestsService {
       }),
     );
 
+    const completedRequests =
+      status === 'done'
+        ? Array.from(donorRequests)
+        : Array.from(
+            await this.requestModel
+              .where('user_Profiles_id', profile._id)
+              .where('status', 'done')
+              .get(),
+          );
+
+    const totalDonations = completedRequests.length;
+
+    const totalVolumeMl = completedRequests.reduce(
+      (total, donorRequest) => total + (donorRequest.volume_ml ?? 0),
+      0,
+    );
+
     return {
       success: true,
+      summary: {
+        total_donations: totalDonations,
+        lives_helped: totalDonations,
+        total_volume_ml: totalVolumeMl,
+      },
       data,
     };
   }
