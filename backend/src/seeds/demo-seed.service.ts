@@ -63,6 +63,12 @@ export class DemoSeedService {
         coordinates: [106.8456, -6.2088] as [number, number],
       },
       isVerified: true,
+      code: '32.73.011',
+      address: 'Jl. Pasteur No. 38, Bandung',
+      unit_donor: 'Unit Donor Darah',
+      pic_name: 'dr. Siti Rahma',
+      contact: '022-1234567',
+      hospital_type: 'RS Tipe A',
     };
 
     if (hospital) {
