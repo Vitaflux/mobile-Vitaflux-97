@@ -12,35 +12,107 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
-import { useQueryClient } from "@tanstack/react-query";
-import { createBlood } from "../../src/api/bloods";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { MapPin } from "lucide-react-native";
+import { createBlood, type BloodComponent } from "../../src/api/bloods";
+import { getMyHospital } from "../../src/api/hospitals";
 import { errorMessage } from "../../src/lib/errorMessage";
 import type { BloodType, Rhesus } from "../../src/types/models";
 
 const GOLONGAN: BloodType[] = ["A", "B", "AB", "O"];
 const RHESUS: Rhesus[] = ["+", "-"];
 
+const COMPONENTS: {
+  value: BloodComponent;
+  label: string;
+}[] = [
+  {
+    value: "whole_blood",
+    label: "Whole blood",
+  },
+  {
+    value: "plasma",
+    label: "Plasma",
+  },
+  {
+    value: "trombosit",
+    label: "Trombosit",
+  },
+  {
+    value: "eritrosit",
+    label: "Eritrosit",
+  },
+];
+
 export default function CreateBlood() {
   const qc = useQueryClient();
 
+  const hospitalQuery = useQuery({
+    queryKey: ["my-hospital"],
+    queryFn: () => getMyHospital(),
+  });
+
+  const [title, setTitle] = useState("");
+  const [component, setComponent] = useState<BloodComponent>("whole_blood");
   const [golongan, setGolongan] = useState<BloodType>("O");
   const [rhesus, setRhesus] = useState<Rhesus>("+");
   const [qty, setQty] = useState(5);
   const [tanggal, setTanggal] = useState("");
-  const [jam, setJam] = useState("");
+  const [jamMulai, setJamMulai] = useState("");
+  const [jamSelesai, setJamSelesai] = useState("");
+  const [note, setNote] = useState("");
   const [urgent, setUrgent] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(tanggal);
-  const timeOk = /^\d{2}:\d{2}$/.test(jam);
+  const dateFormatOk = /^\d{4}-\d{2}-\d{2}$/.test(tanggal);
+  const startTimeFormatOk = /^\d{2}:\d{2}$/.test(jamMulai);
+  const endTimeFormatOk = /^\d{2}:\d{2}$/.test(jamSelesai);
 
-  const valid = qty >= 1 && dateOk && timeOk;
+  const schedule =
+    dateFormatOk && startTimeFormatOk
+      ? new Date(`${tanggal}T${jamMulai}:00`)
+      : null;
+
+  const scheduleEnd =
+    dateFormatOk && endTimeFormatOk
+      ? new Date(`${tanggal}T${jamSelesai}:00`)
+      : null;
+
+  const scheduleValid =
+    schedule !== null &&
+    scheduleEnd !== null &&
+    !Number.isNaN(schedule.getTime()) &&
+    !Number.isNaN(scheduleEnd.getTime()) &&
+    scheduleEnd.getTime() > schedule.getTime();
+
+  const valid = title.trim().length > 0 && qty >= 1 && scheduleValid;
+
+  const selectedComponent =
+    COMPONENTS.find((item) => item.value === component)?.label ?? "Whole blood";
 
   async function onSubmit() {
-    if (!valid) {
+    if (!title.trim()) {
       Alert.alert(
-        "Lengkapi data",
-        "Isi jumlah, tanggal (YYYY-MM-DD), dan jam (HH:MM).",
+        "Judul belum diisi",
+        "Isi judul kebutuhan darah terlebih dahulu.",
+      );
+
+      return;
+    }
+
+    if (!dateFormatOk || !startTimeFormatOk || !endTimeFormatOk) {
+      Alert.alert(
+        "Jadwal belum lengkap",
+        "Isi tanggal dengan format YYYY-MM-DD dan jam dengan format HH:MM.",
+      );
+
+      return;
+    }
+
+    if (!scheduleValid) {
+      Alert.alert(
+        "Rentang waktu tidak valid",
+        "Jam selesai harus lebih besar dari jam mulai.",
       );
 
       return;
@@ -50,10 +122,14 @@ export default function CreateBlood() {
 
     try {
       await createBlood({
+        title: title.trim(),
         blood_type: golongan,
         rhesus,
         quantity: qty,
-        schedule: `${tanggal}T${jam}:00`,
+        component,
+        schedule: `${tanggal}T${jamMulai}:00`,
+        schedule_end: `${tanggal}T${jamSelesai}:00`,
+        note: note.trim() || null,
         status_blood: urgent ? "urgent" : "normal",
       });
 
@@ -61,14 +137,17 @@ export default function CreateBlood() {
         queryKey: ["facility-bloods"],
       });
 
-      Alert.alert("Terbit", "Kebutuhan berhasil dibuat.", [
+      Alert.alert("Kebutuhan diterbitkan", "Kebutuhan darah berhasil dibuat.", [
         {
           text: "OK",
           onPress: () => router.replace("/(facility)"),
         },
       ]);
-    } catch (e: any) {
-      Alert.alert("Gagal", errorMessage(e, "Coba lagi atau periksa koneksi."));
+    } catch (error: any) {
+      Alert.alert(
+        "Gagal membuat kebutuhan",
+        errorMessage(error, "Coba lagi atau periksa koneksi."),
+      );
     } finally {
       setSaving(false);
     }
@@ -90,6 +169,47 @@ export default function CreateBlood() {
             </Text>
           </View>
 
+          {/* Judul */}
+          <Label>Judul kebutuhan</Label>
+
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Contoh: Donor darah rutin Agustus"
+            placeholderTextColor="#9B9797"
+            maxLength={100}
+            className={inputCls}
+          />
+
+          {/* Komponen */}
+          <Label>Komponen darah</Label>
+
+          <View className="flex-row flex-wrap gap-2">
+            {COMPONENTS.map((item) => {
+              const active = component === item.value;
+
+              return (
+                <Pressable
+                  key={item.value}
+                  onPress={() => setComponent(item.value)}
+                  className={`rounded-pill border px-4 py-3 ${
+                    active
+                      ? "border-primary bg-primary"
+                      : "border-line bg-surface"
+                  }`}
+                >
+                  <Text
+                    className={`font-archivo-semibold text-caption ${
+                      active ? "text-white" : "text-ink"
+                    }`}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           {/* Golongan darah */}
           <Label>Golongan darah</Label>
 
@@ -100,8 +220,6 @@ export default function CreateBlood() {
           />
 
           {/* Rhesus */}
-          <View className="h-4" />
-
           <Label>Rhesus</Label>
 
           <Seg
@@ -111,8 +229,6 @@ export default function CreateBlood() {
           />
 
           {/* Jumlah */}
-          <View className="h-4" />
-
           <Label>Jumlah pendonor dibutuhkan</Label>
 
           <View className="flex-row items-center">
@@ -138,33 +254,85 @@ export default function CreateBlood() {
           </View>
 
           {/* Jadwal */}
-          <View className="h-4" />
+          <Label>Tanggal</Label>
+
+          <TextInput
+            value={tanggal}
+            onChangeText={setTanggal}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#9B9797"
+            keyboardType="numbers-and-punctuation"
+            maxLength={10}
+            className={inputCls}
+          />
 
           <View className="flex-row gap-3">
             <View className="flex-1">
-              <Label>Tanggal</Label>
+              <Label>Jam mulai</Label>
 
               <TextInput
-                value={tanggal}
-                onChangeText={setTanggal}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#9b9797"
+                value={jamMulai}
+                onChangeText={setJamMulai}
+                placeholder="HH:MM"
+                placeholderTextColor="#9B9797"
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
                 className={inputCls}
               />
             </View>
 
             <View className="flex-1">
-              <Label>Jam</Label>
+              <Label>Jam selesai</Label>
 
               <TextInput
-                value={jam}
-                onChangeText={setJam}
+                value={jamSelesai}
+                onChangeText={setJamSelesai}
                 placeholder="HH:MM"
-                placeholderTextColor="#9b9797"
+                placeholderTextColor="#9B9797"
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
                 className={inputCls}
               />
             </View>
           </View>
+
+          {/* Lokasi */}
+          <Label>Lokasi pengambilan</Label>
+
+          <View className="flex-row items-start p-4 border rounded-card border-line bg-surface">
+            <MapPin color="#605D5D" size={20} />
+
+            <View className="flex-1 ml-3">
+              {hospitalQuery.isLoading ? (
+                <ActivityIndicator color="#EC3013" />
+              ) : (
+                <>
+                  <Text className="font-archivo-semibold text-body text-ink">
+                    {hospitalQuery.data?.hospital_name ?? "Fasilitas kesehatan"}
+                  </Text>
+
+                  <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                    {hospitalQuery.data?.address ??
+                      "Alamat faskes belum tersedia"}
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+
+          {/* Catatan */}
+          <Label>Catatan dari faskes</Label>
+
+          <TextInput
+            value={note}
+            onChangeText={setNote}
+            placeholder="Tambahkan instruksi atau informasi untuk pendonor"
+            placeholderTextColor="#9B9797"
+            multiline
+            textAlignVertical="top"
+            maxLength={500}
+            className={`${inputCls} min-h-28`}
+          />
 
           {/* Urgent */}
           <Pressable
@@ -189,7 +357,7 @@ export default function CreateBlood() {
               </Text>
 
               <Text className="mt-1 leading-5 font-archivo text-caption text-ink-muted">
-                Kirim notifikasi ke pendonor cocok dalam radius terdekat.
+                Kirim notifikasi ke pendonor yang cocok dalam radius terdekat.
               </Text>
             </View>
           </Pressable>
@@ -200,11 +368,34 @@ export default function CreateBlood() {
           </Text>
 
           <View className="rounded-[18px] border border-line bg-surface p-4">
-            <Text className="font-archivo text-body text-ink">
-              {qty} kantong {golongan}
-              {rhesus} · {urgent ? "mendesak" : "rutin"}
-              {dateOk && timeOk ? ` · ${tanggal} ${jam}` : ""}
+            <Text className="font-archivo-bold text-body text-ink">
+              {title.trim() || "Judul kebutuhan"}
             </Text>
+
+            <Text className="mt-2 font-archivo text-caption text-ink-muted">
+              {selectedComponent} · {qty} kantong {golongan}
+              {rhesus}
+            </Text>
+
+            <Text className="mt-1 font-archivo text-caption text-ink-muted">
+              {dateFormatOk && startTimeFormatOk && endTimeFormatOk
+                ? `${tanggal} · ${jamMulai}–${jamSelesai}`
+                : "Jadwal belum lengkap"}
+            </Text>
+
+            <View
+              className={`self-start px-3 py-1 mt-3 rounded-pill ${
+                urgent ? "bg-primary" : "bg-ground"
+              }`}
+            >
+              <Text
+                className={`font-archivo-bold text-overline tracking-overline ${
+                  urgent ? "text-white" : "text-ink-muted"
+                }`}
+              >
+                {urgent ? "MENDESAK" : "RUTIN"}
+              </Text>
+            </View>
           </View>
         </ScrollView>
 
@@ -212,13 +403,15 @@ export default function CreateBlood() {
         <View className="px-6 pt-3 pb-2 border-t border-line bg-ground">
           <Pressable
             onPress={onSubmit}
-            disabled={saving}
+            disabled={saving || !valid}
             className={`items-center rounded-pill py-4 ${
-              saving ? "bg-primary/60" : "bg-primary active:bg-primary-dark"
+              saving || !valid
+                ? "bg-primary/60"
+                : "bg-primary active:bg-primary-dark"
             }`}
           >
             {saving ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text className="text-white font-archivo-bold text-body">
                 Terbitkan
@@ -232,7 +425,7 @@ export default function CreateBlood() {
 }
 
 const inputCls =
-  "rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink";
+  "rounded-card border border-line bg-surface px-4 py-[14px] font-archivo text-body text-ink";
 
 function Label({ children }: { children: ReactNode }) {
   return (
