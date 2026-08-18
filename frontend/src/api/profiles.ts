@@ -9,17 +9,23 @@ import type {
 export interface UpdateProfileInput {
   blood_type: BloodType;
   rhesus: Rhesus;
-  location: GeoPoint; // WAJIB — GeoJSON Point [lng, lat]
-  last_donor?: string | null; // ISO date, opsional
+  location: GeoPoint;
+  last_donor?: string | null;
+  birth_date?: string | null;
+  weight_kg?: number | null;
+  city?: string | null;
+  notify_radius_km?: number | null;
 }
 
-// GET 404 kalau donor belum punya profil.
+// GET 404 kalau donor belum memiliki profil.
 export async function getMyProfile() {
   const { data } = await api.get<DonorProfile>("/profiles/me");
+
   return data;
 }
 
 export async function updateMyProfile(input: UpdateProfileInput) {
   const { data } = await api.patch<DonorProfile>("/profiles/me", input);
+
   return data;
 }
