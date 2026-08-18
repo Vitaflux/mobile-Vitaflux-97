@@ -7,6 +7,7 @@ import {
   Post,
   Req,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -18,6 +19,7 @@ import { RequestBloodParamDto } from './dto/request-blood-param.dto';
 import { RequestIdParamDto } from './dto/request-id-param.dto';
 import { CheckInRequestDto } from './dto/check-in-request.dto';
 import { RequestsService } from './requests.service';
+import { MyRequestsQueryDto } from './dto/my-requests-query.dto';
 
 interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -37,6 +39,19 @@ export class RequestsController {
     return this.requestsService.registerDonor(
       request.user.userId,
       createRequestDto,
+    );
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('donor')
+  findMine(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: MyRequestsQueryDto,
+  ) {
+    return this.requestsService.findMineForDonor(
+      request.user.userId,
+      query.status,
     );
   }
 

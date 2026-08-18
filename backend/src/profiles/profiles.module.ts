@@ -4,9 +4,14 @@ import { AuthModule } from '../auth/auth.module';
 import { UserProfile } from './entities/user-profile.model';
 import { ProfilesController } from './profiles.controller';
 import { ProfilesService } from './profiles.service';
+import { Request } from '../requests/entities/request.model';
+import { User } from '../users/entities/user.model';
 
 @Module({
-  imports: [MongoloquentModule.forFeature([UserProfile]), AuthModule],
+  imports: [
+    MongoloquentModule.forFeature([UserProfile, Request, User]),
+    AuthModule,
+  ],
   controllers: [ProfilesController],
   providers: [ProfilesService],
 })

@@ -8,6 +8,12 @@ export interface IHospital extends IMongoloquentSchema {
   hospital_name: string;
   location: GeoPoint;
   isVerified: boolean;
+  code?: string | null;
+  address?: string | null;
+  unit_donor?: string | null;
+  pic_name?: string | null;
+  contact?: string | null;
+  hospital_type?: string | null;
 }
 
 export class Hospital extends Model<IHospital> {
