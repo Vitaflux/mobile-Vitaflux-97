@@ -14,6 +14,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { UserProfile } from '../profiles/entities/user-profile.model';
 import { CreateBloodDto } from './dto/create-blood.dto';
 import { Blood } from './entities/blood.model';
+import { Request } from '../requests/entities/request.model';
 
 @Injectable()
 export class BloodsService implements OnModuleInit {
@@ -28,6 +29,9 @@ export class BloodsService implements OnModuleInit {
 
     @InjectModel(UserProfile)
     private readonly userProfileModel: UserProfile,
+
+    @InjectModel(Request)
+    private readonly requestModel: Request,
 
     private readonly notificationsService: NotificationsService,
   ) {}
@@ -141,22 +145,76 @@ export class BloodsService implements OnModuleInit {
       .where('hospitals_id', hospital._id)
       .get();
 
+    const bloodList = Array.from(bloods);
+    const bloodIds = bloodList.map((blood) => blood._id);
+
+    const requests =
+      bloodIds.length === 0
+        ? []
+        : Array.from(
+            await this.requestModel.whereIn('bloods_id', bloodIds).get(),
+          );
+
+    const requestCountsByBloodId = new Map<
+      string,
+      {
+        applicantsCount: number;
+        collected: number;
+      }
+    >();
+
+    let confirmedCount = 0;
+    let doneCount = 0;
+
+    for (const request of requests) {
+      const bloodId = request.bloods_id.toString();
+      const currentCounts = requestCountsByBloodId.get(bloodId) ?? {
+        applicantsCount: 0,
+        collected: 0,
+      };
+
+      currentCounts.applicantsCount += 1;
+
+      if (request.status === 'confirmed') {
+        currentCounts.collected += 1;
+        confirmedCount += 1;
+      }
+
+      if (request.status === 'done') {
+        currentCounts.collected += 1;
+        doneCount += 1;
+      }
+
+      requestCountsByBloodId.set(bloodId, currentCounts);
+    }
+
     return {
       success: true,
-      data: bloods.map((blood) => ({
-        id: blood._id.toString(),
-        hospitals_id: blood.hospitals_id.toString(),
-        blood_type: blood.blood_type,
-        rhesus: blood.rhesus,
-        quantity: blood.quantity,
-        status_blood: blood.status_blood,
-        schedule: blood.schedule,
-        title: blood.title ?? null,
-        note: blood.note ?? null,
-        component: blood.component ?? null,
-        schedule_end: blood.schedule_end ?? null,
-        created_at: blood.created_at,
-      })),
+      confirmedCount,
+      doneCount,
+      data: bloodList.map((blood) => {
+        const counts = requestCountsByBloodId.get(blood._id.toString()) ?? {
+          applicantsCount: 0,
+          collected: 0,
+        };
+
+        return {
+          id: blood._id.toString(),
+          hospitals_id: blood.hospitals_id.toString(),
+          blood_type: blood.blood_type,
+          rhesus: blood.rhesus,
+          quantity: blood.quantity,
+          status_blood: blood.status_blood,
+          schedule: blood.schedule,
+          title: blood.title ?? null,
+          note: blood.note ?? null,
+          component: blood.component ?? null,
+          schedule_end: blood.schedule_end ?? null,
+          applicants_count: counts.applicantsCount,
+          collected: counts.collected,
+          created_at: blood.created_at,
+        };
+      }),
     };
   }
 
