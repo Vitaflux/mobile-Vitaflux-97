@@ -12,6 +12,11 @@ export interface IUserProfile extends IMongoloquentSchema {
   location: GeoPoint;
   last_donor: Date | null;
   push_token: string | null;
+
+  birth_date?: Date | null;
+  weight_kg?: number | null;
+  city?: string | null;
+  notify_radius_km?: number | null;
 }
 
 export class UserProfile extends Model<IUserProfile> {
