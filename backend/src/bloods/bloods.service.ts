@@ -410,6 +410,7 @@ export class BloodsService implements OnModuleInit {
             ? {
                 id: hospitalData._id.toString(),
                 hospital_name: hospitalData.hospital_name,
+                address: hospitalData.address ?? null,
                 location: hospitalData.location,
               }
             : null,
