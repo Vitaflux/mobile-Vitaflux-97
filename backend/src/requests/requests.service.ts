@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ObjectId } from 'mongodb';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { Blood } from '../bloods/entities/blood.model';
 import { calculateDonorEligibility } from '../common/helpers/donor-eligibility.helper';
 import { Hospital } from '../hospitals/entities/hospital.model';
@@ -35,6 +35,21 @@ export class RequestsService {
     @InjectModel(User)
     private readonly userModel: User,
   ) {}
+
+  private async generateUniqueCode(): Promise<string> {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const code = `VF-${randomInt(1000, 10000)}`;
+      const existingRequest = await this.requestModel
+        .where('code', code)
+        .first();
+
+      if (!existingRequest) {
+        return code;
+      }
+    }
+
+    throw new ConflictException('Unable to generate unique request code');
+  }
 
   async registerDonor(userId: string, createRequestDto: CreateRequestDto) {
     if (!ObjectId.isValid(userId)) {
@@ -87,6 +102,8 @@ export class RequestsService {
       );
     }
 
+    const code = await this.generateUniqueCode();
+
     const request = await this.requestModel.insert({
       bloods_id: blood._id,
       user_Profiles_id: profile._id,
@@ -96,6 +113,9 @@ export class RequestsService {
       },
       status: 'registered',
       qr_token: randomUUID(),
+      code,
+      checked_in_at: null,
+      volume_ml: null,
     });
 
     return {
@@ -107,6 +127,9 @@ export class RequestsService {
         screenings: request.screenings,
         status: request.status,
         qr_token: request.qr_token,
+        code: request.code,
+        checked_in_at: request.checked_in_at ?? null,
+        volume_ml: request.volume_ml ?? null,
       },
     };
   }
@@ -163,6 +186,9 @@ export class RequestsService {
           screenings: request.screenings,
           status: request.status,
           qr_token: request.qr_token,
+          code: request.code ?? null,
+          checked_in_at: request.checked_in_at ?? null,
+          volume_ml: request.volume_ml ?? null,
         };
       }),
     );
@@ -223,11 +249,14 @@ export class RequestsService {
         screenings: donorRequest.screenings,
         status: 'confirmed',
         qr_token: donorRequest.qr_token,
+        code: donorRequest.code ?? null,
+        checked_in_at: donorRequest.checked_in_at ?? null,
+        volume_ml: donorRequest.volume_ml ?? null,
       },
     };
   }
 
-  async checkInForFacility(userId: string, qrToken: string) {
+  async checkInForFacility(userId: string, qrToken: string, volumeMl?: number) {
     if (!ObjectId.isValid(userId)) {
       throw new UnauthorizedException('Invalid authenticated user');
     }
@@ -264,8 +293,12 @@ export class RequestsService {
       );
     }
 
+    const checkedInAt = new Date();
+
     await this.requestModel.where('_id', donorRequest._id).update({
       status: 'done',
+      checked_in_at: checkedInAt,
+      volume_ml: volumeMl ?? null,
     });
 
     return {
@@ -277,6 +310,9 @@ export class RequestsService {
         screenings: donorRequest.screenings,
         status: 'done',
         qr_token: donorRequest.qr_token,
+        code: donorRequest.code ?? null,
+        checked_in_at: checkedInAt,
+        volume_ml: volumeMl ?? null,
       },
     };
   }
@@ -316,10 +352,11 @@ export class RequestsService {
 
         return {
           id: donorRequest._id.toString(),
-          code: null,
+          code: donorRequest.code ?? null,
           qr_token: donorRequest.qr_token,
           status: donorRequest.status,
-          checked_in_at: null,
+          checked_in_at: donorRequest.checked_in_at ?? null,
+          volume_ml: donorRequest.volume_ml ?? null,
           blood: blood
             ? {
                 id: blood._id.toString(),

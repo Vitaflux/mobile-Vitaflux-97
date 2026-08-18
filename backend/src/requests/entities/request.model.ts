@@ -15,6 +15,9 @@ export interface IRequest extends IMongoloquentSchema {
   screenings: IRequestScreenings;
   status: RequestStatus;
   qr_token: string;
+  code: string;
+  checked_in_at?: Date | null;
+  volume_ml?: number | null;
 }
 
 export class Request extends Model<IRequest> {

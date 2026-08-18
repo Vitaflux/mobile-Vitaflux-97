@@ -91,6 +91,7 @@ export class RequestsController {
     return this.requestsService.checkInForFacility(
       request.user.userId,
       checkInRequestDto.qr_token,
+      checkInRequestDto.volume_ml,
     );
   }
 }
