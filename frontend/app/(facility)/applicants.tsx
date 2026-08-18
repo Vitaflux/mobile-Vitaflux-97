@@ -17,7 +17,11 @@ import { errorMessage } from "../../src/lib/errorMessage";
 
 type Applicant = {
   id: string;
-  donor: { name: string | null; blood_type: string; rhesus: string } | null;
+  donor: {
+    name: string | null;
+    blood_type: string;
+    rhesus: string;
+  } | null;
   status: "registered" | "confirmed" | "done";
   qr_token: string;
 };
@@ -31,13 +35,28 @@ const FILTERS = [
 
 function StatusBadge({ status }: { status: Applicant["status"] }) {
   const map = {
-    registered: { t: "Terdaftar", c: "bg-ground", f: "text-ink-muted" },
-    confirmed: { t: "Dikonfirmasi", c: "bg-ink", f: "text-white" },
-    done: { t: "Selesai", c: "border border-line", f: "text-ink" },
+    registered: {
+      t: "Terdaftar",
+      c: "bg-ground",
+      f: "text-ink-muted",
+    },
+    confirmed: {
+      t: "Dikonfirmasi",
+      c: "bg-ink",
+      f: "text-white",
+    },
+    done: {
+      t: "Selesai",
+      c: "border border-line",
+      f: "text-ink",
+    },
   }[status];
+
   return (
     <View className={`rounded-pill px-3 py-1 ${map.c}`}>
-      <Text className={`font-archivo-bold text-overline tracking-overline ${map.f}`}>
+      <Text
+        className={`font-archivo-bold text-overline tracking-overline ${map.f}`}
+      >
         {map.t}
       </Text>
     </View>
@@ -47,7 +66,9 @@ function StatusBadge({ status }: { status: Applicant["status"] }) {
 export default function Applicants() {
   const params = useLocalSearchParams<{ bloodId?: string }>();
   const bloodId = params.bloodId ?? "";
+
   const qc = useQueryClient();
+
   const [filter, setFilter] = useState("all");
   const [confirming, setConfirming] = useState<string | null>(null);
 
@@ -58,13 +79,21 @@ export default function Applicants() {
   });
 
   const all = (q.data ?? []) as unknown as Applicant[];
-  const list = filter === "all" ? all : all.filter((a) => a.status === filter);
+
+  const list =
+    filter === "all"
+      ? all
+      : all.filter((applicant) => applicant.status === filter);
 
   async function onConfirm(id: string) {
     setConfirming(id);
+
     try {
       await confirmRequest(id);
-      await qc.invalidateQueries({ queryKey: ["applicants", bloodId] });
+
+      await qc.invalidateQueries({
+        queryKey: ["applicants", bloodId],
+      });
     } catch (e: any) {
       Alert.alert("Gagal konfirmasi", errorMessage(e, "Coba lagi."));
     } finally {
@@ -75,59 +104,100 @@ export default function Applicants() {
   return (
     <View className="flex-1 bg-ground">
       <StatusBar style="dark" />
+
       <SafeAreaView className="flex-1">
+        {/* Header */}
         <View className="px-6">
-          <View className="h-12 flex-row items-center">
-            <Pressable onPress={() => router.back()} hitSlop={8} className="mr-3">
-              <Text className="text-2xl text-ink">←</Text>
-            </Pressable>
-            <Text className="font-archivo-semibold text-body text-ink">
+          <View className="flex-row items-center h-12">
+            {bloodId ? (
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={8}
+                className="mr-3"
+              >
+                <Text className="text-2xl text-ink">←</Text>
+              </Pressable>
+            ) : null}
+
+            <Text className="font-archivo-bold text-subjudul text-ink">
               Pendaftar
             </Text>
           </View>
 
-          {/* Filter */}
-          <View className="mt-2 flex-row gap-2">
-            {FILTERS.map((fl) => {
-              const active = fl.key === filter;
-              return (
-                <Pressable
-                  key={fl.key}
-                  onPress={() => setFilter(fl.key)}
-                  className={`rounded-pill border px-3 py-2 ${
-                    active
-                      ? "border-primary bg-primary"
-                      : "border-line bg-surface"
-                  }`}
-                >
-                  <Text
-                    className={`font-archivo-semibold text-caption ${
-                      active ? "text-white" : "text-ink"
+          {/* Filter cuma muncul kalau sudah pilih kebutuhan */}
+          {bloodId ? (
+            <View className="flex-row gap-2 mt-2">
+              {FILTERS.map((fl) => {
+                const active = fl.key === filter;
+
+                return (
+                  <Pressable
+                    key={fl.key}
+                    onPress={() => setFilter(fl.key)}
+                    className={`rounded-pill border px-3 py-2 ${
+                      active
+                        ? "border-primary bg-primary"
+                        : "border-line bg-surface"
                     }`}
                   >
-                    {fl.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                    <Text
+                      className={`font-archivo-semibold text-caption ${
+                        active ? "text-white" : "text-ink"
+                      }`}
+                    >
+                      {fl.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
 
         <ScrollView
           contentContainerClassName="px-6 pt-4 pb-10"
           refreshControl={
-            <RefreshControl refreshing={q.isFetching} onRefresh={() => q.refetch()} />
+            bloodId ? (
+              <RefreshControl
+                refreshing={q.isFetching}
+                onRefresh={() => q.refetch()}
+              />
+            ) : undefined
           }
         >
-          {q.isLoading ? (
+          {/* Belum pilih kebutuhan dari Dashboard */}
+          {!bloodId ? (
+            <View className="rounded-[18px] border border-line bg-surface p-5">
+              <Text className="font-archivo-bold text-body text-ink">
+                Pilih kebutuhan terlebih dahulu
+              </Text>
+
+              <Text className="mt-1 leading-5 font-archivo text-caption text-ink-muted">
+                Pilih salah satu kebutuhan aktif dari Dashboard untuk melihat
+                daftar pendonor yang sudah mendaftar.
+              </Text>
+
+              <Pressable
+                onPress={() => router.push("/(facility)")}
+                className="items-center py-3 mt-5 rounded-pill bg-primary active:bg-primary-dark"
+              >
+                <Text className="text-white font-archivo-bold text-body">
+                  Ke Dashboard
+                </Text>
+              </Pressable>
+            </View>
+          ) : q.isLoading ? (
+            /* Loading */
             <View className="items-center py-10">
               <ActivityIndicator color="#EC3013" />
             </View>
           ) : list.length === 0 ? (
+            /* Empty */
             <View className="rounded-[18px] border border-line bg-surface p-5">
               <Text className="font-archivo-bold text-body text-ink">
                 Belum ada pendaftar
               </Text>
+
               <Text className="mt-1 font-archivo text-caption text-ink-muted">
                 {filter === "all"
                   ? "Belum ada yang mendaftar ke kebutuhan ini."
@@ -135,6 +205,7 @@ export default function Applicants() {
               </Text>
             </View>
           ) : (
+            /* List */
             <View className="gap-3">
               {list.map((a) => (
                 <View
@@ -142,32 +213,40 @@ export default function Applicants() {
                   className="rounded-[18px] border border-line bg-surface p-4"
                 >
                   <View className="flex-row items-center">
-                    <View className="mr-3 h-11 w-11 items-center justify-center rounded-card bg-primary-soft">
+                    {/* Avatar */}
+                    <View className="items-center justify-center mr-3 h-11 w-11 rounded-card bg-primary-soft">
                       <Text className="font-archivo-black text-body text-primary-dark">
                         {(a.donor?.name?.[0] ?? "?").toUpperCase()}
                       </Text>
                     </View>
+
+                    {/* Donor */}
                     <View className="flex-1">
                       <Text className="font-archivo-bold text-body text-ink">
                         {a.donor?.name ?? "Pendonor"}
                       </Text>
+
                       <Text className="mt-0.5 font-archivo text-caption text-ink-muted">
-                        {a.donor ? `${a.donor.blood_type}${a.donor.rhesus}` : "-"}
+                        {a.donor
+                          ? `${a.donor.blood_type}${a.donor.rhesus}`
+                          : "-"}
                       </Text>
                     </View>
+
                     <StatusBadge status={a.status} />
                   </View>
 
+                  {/* Confirm */}
                   {a.status === "registered" && (
                     <Pressable
                       onPress={() => onConfirm(a.id)}
                       disabled={confirming === a.id}
-                      className="mt-4 items-center rounded-pill bg-primary py-3 active:bg-primary-dark"
+                      className="items-center py-3 mt-4 rounded-pill bg-primary active:bg-primary-dark"
                     >
                       {confirming === a.id ? (
                         <ActivityIndicator color="#fff" />
                       ) : (
-                        <Text className="font-archivo-bold text-body text-white">
+                        <Text className="text-white font-archivo-bold text-body">
                           Konfirmasi
                         </Text>
                       )}
