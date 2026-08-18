@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ObjectId } from 'mongodb';
 import { randomInt, randomUUID } from 'node:crypto';
@@ -286,6 +287,21 @@ export class RequestsService {
     if (!blood || !blood.hospitals_id.equals(hospital._id)) {
       throw new NotFoundException('Donor request was not found');
     }
+    const now = new Date();
+    const scheduleStart = new Date(blood.schedule);
+    const scheduleEnd = blood.schedule_end
+      ? new Date(blood.schedule_end)
+      : null;
+
+    if (now < scheduleStart) {
+      throw new BadRequestException(
+        'QR cannot be used because the donation schedule has not started',
+      );
+    }
+
+    if (scheduleEnd && now > scheduleEnd) {
+      throw new BadRequestException('QR/schedule has expired');
+    }
 
     if (!canTransitionRequestStatus(donorRequest.status, 'done')) {
       throw new ConflictException(
@@ -293,7 +309,7 @@ export class RequestsService {
       );
     }
 
-    const checkedInAt = new Date();
+    const checkedInAt = now;
 
     await this.requestModel.where('_id', donorRequest._id).update({
       status: 'done',
