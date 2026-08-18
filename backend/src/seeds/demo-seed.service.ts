@@ -136,6 +136,10 @@ export class DemoSeedService {
       quantity: 5,
       status_blood: 'urgent' as const,
       schedule: new Date('2026-08-20T09:00:00.000Z'),
+      title: 'Urgent O+ Blood Donation',
+      note: 'Donor should be in good health and bring an identity card.',
+      component: 'whole_blood' as const,
+      schedule_end: new Date('2026-08-20T15:00:00.000Z'),
       created_at: new Date(),
     };
 

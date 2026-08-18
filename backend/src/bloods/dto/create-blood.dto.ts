@@ -1,11 +1,20 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsIn, IsInt, Min } from 'class-validator';
 import {
+  IsDateString,
+  IsIn,
+  IsInt,
+  Min,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import {
+  BLOOD_COMPONENTS,
   BLOOD_STATUSES,
   BLOOD_TYPES,
   RHESUS_TYPES,
 } from '../../common/constants';
 import type {
+  BloodComponent,
   BloodStatus,
   BloodType,
   RhesusType,
@@ -32,4 +41,20 @@ export class CreateBloodDto {
 
   @IsIn(CREATEABLE_BLOOD_STATUSES)
   status_blood!: BloodStatus;
+
+  @IsOptional()
+  @IsString()
+  title?: string | null;
+
+  @IsOptional()
+  @IsString()
+  note?: string | null;
+
+  @IsOptional()
+  @IsIn(BLOOD_COMPONENTS)
+  component?: BloodComponent | null;
+
+  @IsOptional()
+  @IsDateString()
+  schedule_end?: string | null;
 }
