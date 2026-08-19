@@ -8,6 +8,7 @@ import { User } from '../users/entities/user.model';
 import { Request } from './entities/request.model';
 import { RequestsController } from './requests.controller';
 import { RequestsService } from './requests.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { RequestsService } from './requests.service';
       User,
     ]),
     AuthModule,
+    NotificationsModule,
   ],
   controllers: [RequestsController],
   providers: [RequestsService],

@@ -2,6 +2,7 @@ import { InjectModel } from '@mongoloquent/nestjs';
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
@@ -17,9 +18,12 @@ import { CreateRequestDto } from './dto/create-request.dto';
 import { Request } from './entities/request.model';
 import { canTransitionRequestStatus } from './helpers/request-status.helper';
 import type { RequestStatus } from '../common/constants';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class RequestsService {
+  private readonly logger = new Logger(RequestsService.name);
+
   constructor(
     @InjectModel(Request)
     private readonly requestModel: Request,
@@ -35,6 +39,8 @@ export class RequestsService {
 
     @InjectModel(User)
     private readonly userModel: User,
+
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private async generateUniqueCode(): Promise<string> {
@@ -241,6 +247,18 @@ export class RequestsService {
       status: 'confirmed',
     });
 
+    try {
+      await this.notificationsService.sendDonorConfirmationNotification({
+        userProfileId: donorRequest.user_Profiles_id,
+        hospitalName: hospital.hospital_name,
+        schedule: new Date(blood.schedule),
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to send confirmation push for request ${donorRequest._id.toString()}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     return {
       success: true,
       data: {
@@ -296,29 +314,13 @@ export class RequestsService {
     if (!blood || !blood.hospitals_id.equals(hospital._id)) {
       throw new NotFoundException('Donor request was not found');
     }
-    const now = new Date();
-    const scheduleStart = new Date(blood.schedule);
-    const scheduleEnd = blood.schedule_end
-      ? new Date(blood.schedule_end)
-      : null;
-
-    if (now < scheduleStart) {
-      throw new BadRequestException(
-        'QR cannot be used because the donation schedule has not started',
-      );
-    }
-
-    if (scheduleEnd && now > scheduleEnd) {
-      throw new BadRequestException('QR/schedule has expired');
-    }
-
     if (!canTransitionRequestStatus(donorRequest.status, 'done')) {
       throw new ConflictException(
         `Request status cannot transition from ${donorRequest.status} to done`,
       );
     }
 
-    const checkedInAt = now;
+    const checkedInAt = new Date();
 
     await this.requestModel.where('_id', donorRequest._id).update({
       status: 'done',

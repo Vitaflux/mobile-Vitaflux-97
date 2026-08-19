@@ -13,10 +13,10 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, CalendarDays, Check, Clock3, Trash2 } from "lucide-react-native";
 
-import { getMyProfile } from "../../src/api/profiles";
+import { myRequests } from "../../src/api/requests";
 import { errorMessage } from "../../src/lib/errorMessage";
 import {
-  addEligibilityToCalendar,
+  addDonorScheduleToCalendar,
   cancelDonorReminder,
   getDonorReminder,
   scheduleDonorReminder,
@@ -34,29 +34,14 @@ const OPTIONS: {
   {
     value: "h-3",
     title: "3 hari sebelumnya",
-    description: "Ingatkan tiga hari sebelum kamu boleh donor lagi.",
+    description: "Ingatkan tiga hari sebelum jadwal yang dikonfirmasi faskes.",
   },
   {
     value: "day",
-    title: "Pada hari donor",
-    description: "Ingatkan pukul 09.00 saat kamu sudah boleh donor.",
+    title: "Pada jadwal donor",
+    description: "Ingatkan tepat pada tanggal dan jam jadwal donor.",
   },
 ];
-
-function formatDate(value?: string | null) {
-  if (!value) return "-";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) return "-";
-
-  return date.toLocaleDateString("id-ID", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
@@ -83,12 +68,21 @@ export default function DonorReminderScreen() {
   const [addingCalendar, setAddingCalendar] = useState(false);
   const [removing, setRemoving] = useState(false);
 
-  const profileQuery = useQuery({
-    queryKey: ["my-profile"],
-    queryFn: getMyProfile,
+  const requestsQuery = useQuery({
+    queryKey: ["my-requests"],
+    queryFn: () => myRequests(),
+    refetchInterval: 5000,
   });
 
-  const eligibleAt = profileQuery.data?.eligibility?.eligible_at ?? null;
+  const confirmedRequest = [...(requestsQuery.data ?? [])]
+    .filter((request) => request.status === "confirmed")
+    .sort((first, second) => second.id.localeCompare(first.id))[0] as
+    | {
+        id: string;
+        blood?: { schedule?: string; title?: string | null } | null;
+      }
+    | undefined;
+  const donorSchedule = confirmedRequest?.blood?.schedule ?? null;
 
   useEffect(() => {
     async function loadReminder() {
@@ -106,10 +100,10 @@ export default function DonorReminderScreen() {
   }, []);
 
   async function onSchedule() {
-    if (!eligibleAt) {
+    if (!donorSchedule) {
       Alert.alert(
-        "Jadwal belum tersedia",
-        "Lengkapi tanggal donor terakhir pada halaman profil.",
+        "Belum dikonfirmasi",
+        "Pengingat dapat dibuat setelah faskes mengonfirmasi pendaftaranmu.",
       );
       return;
     }
@@ -117,7 +111,7 @@ export default function DonorReminderScreen() {
     setScheduling(true);
 
     try {
-      const result = await scheduleDonorReminder(eligibleAt, timing);
+      const result = await scheduleDonorReminder(donorSchedule, timing);
 
       setReminder(result);
 
@@ -136,10 +130,10 @@ export default function DonorReminderScreen() {
   }
 
   async function onAddCalendar() {
-    if (!eligibleAt) {
+    if (!donorSchedule) {
       Alert.alert(
-        "Jadwal belum tersedia",
-        "Lengkapi tanggal donor terakhir pada halaman profil.",
+        "Belum dikonfirmasi",
+        "Jadwal donor belum dikonfirmasi oleh faskes.",
       );
       return;
     }
@@ -147,7 +141,7 @@ export default function DonorReminderScreen() {
     setAddingCalendar(true);
 
     try {
-      await addEligibilityToCalendar(eligibleAt);
+      await addDonorScheduleToCalendar(donorSchedule);
     } catch (error: any) {
       Alert.alert(
         "Kalender gagal dibuka",
@@ -222,18 +216,18 @@ export default function DonorReminderScreen() {
           </Text>
 
           {/* Jadwal kelayakan */}
-          {profileQuery.isLoading ? (
+          {requestsQuery.isLoading ? (
             <View className="items-center py-12">
               <ActivityIndicator color="#EC3013" />
 
               <Text className="mt-3 font-archivo text-caption text-ink-muted">
-                Memuat jadwal kelayakan...
+                Memuat jadwal donor...
               </Text>
             </View>
-          ) : profileQuery.isError ? (
+          ) : requestsQuery.isError ? (
             <View className="p-5 mt-6 border rounded-card border-line bg-surface">
               <Text className="font-archivo-bold text-body text-ink">
-                Jadwal belum dapat dimuat
+                Jadwal donor belum dapat dimuat
               </Text>
 
               <Text className="mt-1 font-archivo text-caption text-ink-muted">
@@ -241,7 +235,7 @@ export default function DonorReminderScreen() {
               </Text>
 
               <Pressable
-                onPress={() => profileQuery.refetch()}
+                onPress={() => requestsQuery.refetch()}
                 className="items-center py-3 mt-4 rounded-pill bg-primary"
               >
                 <Text className="text-white font-archivo-bold text-body">
@@ -252,7 +246,7 @@ export default function DonorReminderScreen() {
           ) : (
             <>
               <Text className="mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
-                BOLEH DONOR LAGI
+                JADWAL DONOR DIKONFIRMASI
               </Text>
 
               <View className="p-5 mt-3 border rounded-card border-primary bg-primary-soft">
@@ -263,29 +257,30 @@ export default function DonorReminderScreen() {
 
                   <View className="flex-1">
                     <Text className="font-archivo-bold text-body text-primary-dark">
-                      {formatDate(eligibleAt)}
+                      {donorSchedule ? formatDateTime(donorSchedule) : "-"}
                     </Text>
 
                     <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                      Berdasarkan tanggal donor terakhir dan interval kelayakan.
+                      {confirmedRequest?.blood?.title ??
+                        "Jadwal dari fasilitas kesehatan"}
                     </Text>
                   </View>
                 </View>
               </View>
 
-              {!eligibleAt ? (
+              {!donorSchedule ? (
                 <View className="p-4 mt-3 border rounded-card border-line bg-surface">
                   <Text className="font-archivo text-caption text-ink-muted">
-                    Tanggal kelayakan belum tersedia. Isi tanggal donor terakhir
-                    terlebih dahulu di halaman Profil.
+                    Belum ada pendaftaran yang dikonfirmasi. Setelah faskes
+                    mengonfirmasi, jadwal donor akan muncul di sini.
                   </Text>
 
                   <Pressable
-                    onPress={() => router.push("/(donor)/profile")}
+                    onPress={() => router.push("/(donor)/status")}
                     className="items-center py-3 mt-4 border rounded-pill border-line"
                   >
                     <Text className="font-archivo-semibold text-body text-ink">
-                      Buka Profil
+                      Lihat Status Pendaftaran
                     </Text>
                   </Pressable>
                 </View>
@@ -319,7 +314,7 @@ export default function DonorReminderScreen() {
                       <Text className="mt-1 font-archivo text-caption text-primary-dark">
                         {reminder.timing === "h-3"
                           ? "3 hari sebelum jadwal donor"
-                          : "Pada hari kelayakan donor"}
+                          : "Pada tanggal dan jam jadwal donor"}
                       </Text>
                     </View>
                   </View>
@@ -400,9 +395,9 @@ export default function DonorReminderScreen() {
               {/* Aktifkan */}
               <Pressable
                 onPress={onSchedule}
-                disabled={scheduling || !eligibleAt}
+                disabled={scheduling || !donorSchedule}
                 className={`flex-row items-center justify-center py-4 mt-6 rounded-pill ${
-                  scheduling || !eligibleAt
+                  scheduling || !donorSchedule
                     ? "bg-primary/60"
                     : "bg-primary active:bg-primary-dark"
                 }`}
@@ -423,7 +418,7 @@ export default function DonorReminderScreen() {
               {/* Kalender */}
               <Pressable
                 onPress={onAddCalendar}
-                disabled={addingCalendar || !eligibleAt}
+                disabled={addingCalendar || !donorSchedule}
                 className="flex-row items-center justify-center py-4 mt-3 border rounded-pill border-line bg-surface"
               >
                 {addingCalendar ? (

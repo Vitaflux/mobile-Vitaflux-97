@@ -10,26 +10,23 @@ export type ReminderTiming = "h-3" | "day";
 
 export type DonorReminder = {
   notificationId: string;
-  eligibleAt: string;
+  scheduleAt: string;
   scheduledFor: string;
   timing: ReminderTiming;
 };
 
-function parseEligibilityDate(eligibleAt: string) {
-  const date = new Date(eligibleAt);
+function parseScheduleDate(scheduleAt: string) {
+  const date = new Date(scheduleAt);
 
   if (Number.isNaN(date.getTime())) {
-    throw new Error("Tanggal kelayakan donor tidak valid.");
+    throw new Error("Jadwal donor tidak valid.");
   }
 
   return date;
 }
 
-function getReminderDate(eligibleAt: string, timing: ReminderTiming): Date {
-  const date = parseEligibilityDate(eligibleAt);
-
-  // Pengingat muncul pukul 09.00 waktu lokal.
-  date.setHours(9, 0, 0, 0);
+function getReminderDate(scheduleAt: string, timing: ReminderTiming): Date {
+  const date = parseScheduleDate(scheduleAt);
 
   if (timing === "h-3") {
     date.setDate(date.getDate() - 3);
@@ -68,7 +65,24 @@ export async function getDonorReminder(): Promise<DonorReminder | null> {
   if (!stored) return null;
 
   try {
-    return JSON.parse(stored) as DonorReminder;
+    const reminder = JSON.parse(stored) as Partial<DonorReminder>;
+
+    // Hapus pengingat versi lama yang masih dihitung dari tanggal kelayakan.
+    if (!reminder.scheduleAt) {
+      if (reminder.notificationId) {
+        try {
+          await Notifications.cancelScheduledNotificationAsync(
+            reminder.notificationId,
+          );
+        } catch {
+          // Notifikasi lama mungkin sudah tidak terjadwal.
+        }
+      }
+      await SecureStore.deleteItemAsync(STORAGE_KEY);
+      return null;
+    }
+
+    return reminder as DonorReminder;
   } catch {
     await SecureStore.deleteItemAsync(STORAGE_KEY);
     return null;
@@ -92,10 +106,10 @@ export async function cancelDonorReminder() {
 }
 
 export async function scheduleDonorReminder(
-  eligibleAt: string,
+  scheduleAt: string,
   timing: ReminderTiming,
 ): Promise<DonorReminder> {
-  const reminderDate = getReminderDate(eligibleAt, timing);
+  const reminderDate = getReminderDate(scheduleAt, timing);
 
   if (reminderDate.getTime() <= Date.now()) {
     throw new Error("Waktu pengingat sudah lewat.");
@@ -108,15 +122,15 @@ export async function scheduleDonorReminder(
     content: {
       title:
         timing === "h-3"
-          ? "Sebentar lagi kamu boleh donor"
-          : "Kamu sudah boleh donor lagi",
+          ? "Jadwal donor tinggal tiga hari lagi"
+          : "Jadwal donor dimulai",
       body:
         timing === "h-3"
-          ? "Tiga hari lagi kamu sudah memenuhi jadwal donor berikutnya."
-          : "Hari ini kamu sudah memenuhi jadwal donor berikutnya.",
+          ? "Tiga hari lagi adalah jadwal donor yang dikonfirmasi faskes."
+          : "Saatnya datang ke fasilitas kesehatan untuk jadwal donormu.",
       sound: "default",
       data: {
-        type: "donor-eligibility",
+        type: "confirmed-donor-schedule",
         route: "/(donor)/pengingat",
       },
     },
@@ -129,7 +143,7 @@ export async function scheduleDonorReminder(
 
   const reminder: DonorReminder = {
     notificationId,
-    eligibleAt,
+    scheduleAt,
     scheduledFor: reminderDate.toISOString(),
     timing,
   };
@@ -139,20 +153,17 @@ export async function scheduleDonorReminder(
   return reminder;
 }
 
-export async function addEligibilityToCalendar(eligibleAt: string) {
-  const startDate = parseEligibilityDate(eligibleAt);
-
-  startDate.setHours(9, 0, 0, 0);
+export async function addDonorScheduleToCalendar(scheduleAt: string) {
+  const startDate = parseScheduleDate(scheduleAt);
 
   const endDate = new Date(startDate);
   endDate.setHours(10, 0, 0, 0);
 
   return Calendar.createEventInCalendarAsync({
-    title: "Boleh donor lagi — Vitaflux",
+    title: "Jadwal donor — Vitaflux",
     startDate,
     endDate,
-    notes:
-      "Kamu sudah memenuhi interval minimum dan dapat melakukan donor darah kembali.",
+    notes: "Jadwal donor yang telah dikonfirmasi oleh fasilitas kesehatan.",
     alarms: [{ relativeOffset: 0 }],
   });
 }
