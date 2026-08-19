@@ -408,6 +408,7 @@ export class RequestsService {
                 quantity: blood.quantity,
                 status_blood: blood.status_blood,
                 schedule: blood.schedule,
+                schedule_end: blood.schedule_end ?? null,
                 title: blood.title ?? null,
                 component: blood.component ?? null,
               }

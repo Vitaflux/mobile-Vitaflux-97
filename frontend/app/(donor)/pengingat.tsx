@@ -39,7 +39,8 @@ const OPTIONS: {
   {
     value: "day",
     title: "Pada jadwal donor",
-    description: "Ingatkan tepat pada tanggal dan jam jadwal donor.",
+    description:
+      "Ingatkan saat jadwal dimulai, atau segera jika jadwal sedang berlangsung.",
   },
 ];
 
@@ -79,10 +80,15 @@ export default function DonorReminderScreen() {
     .sort((first, second) => second.id.localeCompare(first.id))[0] as
     | {
         id: string;
-        blood?: { schedule?: string; title?: string | null } | null;
+        blood?: {
+          schedule?: string;
+          schedule_end?: string | null;
+          title?: string | null;
+        } | null;
       }
     | undefined;
   const donorSchedule = confirmedRequest?.blood?.schedule ?? null;
+  const donorScheduleEnd = confirmedRequest?.blood?.schedule_end ?? null;
 
   useEffect(() => {
     async function loadReminder() {
@@ -111,7 +117,11 @@ export default function DonorReminderScreen() {
     setScheduling(true);
 
     try {
-      const result = await scheduleDonorReminder(donorSchedule, timing);
+      const result = await scheduleDonorReminder(
+        donorSchedule,
+        timing,
+        donorScheduleEnd,
+      );
 
       setReminder(result);
 
