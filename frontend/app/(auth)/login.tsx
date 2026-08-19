@@ -13,35 +13,62 @@ import { router } from "expo-router";
 import { useAuth } from "../../src/store/auth";
 import { errorMessage } from "../../src/lib/errorMessage";
 import { registerPushTokenForCurrentDevice } from "../../src/lib/pushNotifications";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Login() {
   const login = useAuth((s) => s.login);
+
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit() {
-    if (!email || !password) {
-      Alert.alert("Lengkapi data", "Isi email dan kata sandi dulu.");
+    const normalizedEmail = email.trim().toLowerCase();
 
+    if (!normalizedEmail || !password) {
+      Alert.alert("Lengkapi data", "Isi email dan kata sandi dulu.");
       return;
     }
 
     setLoading(true);
 
     try {
-      await login(email.trim(), password);
+      /*
+       * Bersihkan semua data akun sebelumnya sebelum membuat
+       * sesi login baru.
+       */
+      queryClient.clear();
 
-      const user = useAuth.getState().user;
+      await login(normalizedEmail, password);
 
-      // Endpoint push token hanya untuk role donor.
-      if (user?.role === "donor") {
-        await registerPushTokenForCurrentDevice();
+      const loggedInUser = useAuth.getState().user;
+
+      if (!loggedInUser) {
+        throw new Error("Data pengguna tidak ditemukan setelah login.");
       }
 
-      router.replace(user?.role === "facility" ? "/(facility)" : "/(donor)");
+      if (loggedInUser.role === "donor") {
+        try {
+          await registerPushTokenForCurrentDevice();
+        } catch (pushError) {
+          /*
+           * Kegagalan push notification tidak boleh menggagalkan login.
+           */
+          console.warn("Push token belum dapat didaftarkan:", pushError);
+        }
+      }
+
+      router.replace(
+        loggedInUser.role === "facility" ? "/(facility)" : "/(donor)",
+      );
     } catch (error: any) {
+      /*
+       * Pastikan tidak ada cache dari percobaan login yang gagal.
+       */
+      queryClient.clear();
+
       Alert.alert(
         "Login gagal",
         errorMessage(error, "Periksa email/sandi atau koneksi backend."),
