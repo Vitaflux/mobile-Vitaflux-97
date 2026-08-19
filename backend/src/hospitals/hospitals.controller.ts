@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -6,6 +14,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { HospitalsService } from './hospitals.service';
 import { UpdateHospitalProfileDto } from './dto/update-hospital-profile.dto';
+import { NearbyHospitalsQueryDto } from './dto/nearby-hospitals-query.dto';
 
 interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -14,6 +23,19 @@ interface AuthenticatedRequest extends Request {
 @Controller('hospitals')
 export class HospitalsController {
   constructor(private readonly hospitalsService: HospitalsService) {}
+
+  @Get('nearby')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('donor')
+  getNearby(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: NearbyHospitalsQueryDto,
+  ) {
+    return this.hospitalsService.findNearbyForDonor(
+      request.user.userId,
+      query.radius,
+    );
+  }
 
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)

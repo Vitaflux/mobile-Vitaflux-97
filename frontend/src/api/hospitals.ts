@@ -33,6 +33,34 @@ export type UpdateFacilityProfileInput = {
   hospital_type?: string | null;
 };
 
+export type NearbyBloodNeed = {
+  id: string;
+  blood_type: "A" | "B" | "AB" | "O";
+  rhesus: "+" | "-";
+  quantity: number;
+  status_blood: "normal" | "urgent";
+  schedule: string;
+  schedule_end: string | null;
+  title: string | null;
+  note: string | null;
+  component: string | null;
+  created_at: string;
+  is_compatible: boolean;
+};
+
+export type NearbyHospital = {
+  id: string;
+  hospital_name: string;
+  address: string | null;
+  location: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+  isVerified: boolean;
+  active_needs_count: number;
+  blood_needs: NearbyBloodNeed[];
+};
+
 export async function getMyHospital() {
   const { data } = await api.get<FacilityProfile>("/hospitals/me");
 
@@ -41,6 +69,16 @@ export async function getMyHospital() {
 
 export async function updateMyHospital(input: UpdateFacilityProfileInput) {
   const { data } = await api.patch<FacilityProfile>("/hospitals/me", input);
+
+  return data;
+}
+
+export async function getNearbyHospitals(radiusMeters: number) {
+  const { data } = await api.get<NearbyHospital[]>("/hospitals/nearby", {
+    params: {
+      radius: radiusMeters,
+    },
+  });
 
   return data;
 }
