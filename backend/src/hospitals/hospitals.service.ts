@@ -7,6 +7,7 @@ import { InjectModel } from '@mongoloquent/nestjs';
 import { ObjectId } from 'mongodb';
 import { Blood } from '../bloods/entities/blood.model';
 import { Request } from '../requests/entities/request.model';
+import { UserProfile } from '../profiles/entities/user-profile.model';
 import { Hospital } from './entities/hospital.model';
 import { UpdateHospitalProfileDto } from './dto/update-hospital-profile.dto';
 
@@ -21,7 +22,78 @@ export class HospitalsService {
 
     @InjectModel(Request)
     private readonly requestModel: Request,
+
+    @InjectModel(UserProfile)
+    private readonly userProfileModel: UserProfile,
   ) {}
+
+  async findNearbyForDonor(userId: string, radius: number) {
+    if (!ObjectId.isValid(userId)) {
+      throw new UnauthorizedException('Invalid authenticated user');
+    }
+
+    const profile = await this.userProfileModel
+      .where('user_id', new ObjectId(userId))
+      .first();
+
+    if (!profile) {
+      return {
+        success: true,
+        data: [],
+      };
+    }
+
+    const nearbyHospitals = await this.hospitalModel
+      .where('location', {
+        $near: {
+          $geometry: profile.location,
+          $maxDistance: radius,
+        },
+      })
+      .get();
+
+    const data = await Promise.all(
+      Array.from(nearbyHospitals).map(async (hospital) => {
+        const bloods = await this.bloodModel
+          .where('hospitals_id', hospital._id)
+          .get();
+
+        const bloodNeeds = Array.from(bloods)
+          .filter((blood) => blood.status_blood !== 'closed')
+          .map((blood) => ({
+            id: blood._id.toString(),
+            blood_type: blood.blood_type,
+            rhesus: blood.rhesus,
+            quantity: blood.quantity,
+            status_blood: blood.status_blood,
+            schedule: blood.schedule,
+            title: blood.title ?? null,
+            note: blood.note ?? null,
+            component: blood.component ?? null,
+            schedule_end: blood.schedule_end ?? null,
+            created_at: blood.created_at,
+            is_compatible:
+              blood.blood_type === profile.blood_type &&
+              blood.rhesus === profile.rhesus,
+          }));
+
+        return {
+          id: hospital._id.toString(),
+          hospital_name: hospital.hospital_name,
+          address: hospital.address ?? null,
+          location: hospital.location,
+          isVerified: hospital.isVerified,
+          active_needs_count: bloodNeeds.length,
+          blood_needs: bloodNeeds,
+        };
+      }),
+    );
+
+    return {
+      success: true,
+      data,
+    };
+  }
 
   async updateForFacility(
     userId: string,

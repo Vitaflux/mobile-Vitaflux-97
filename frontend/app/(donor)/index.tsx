@@ -12,9 +12,10 @@ import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin } from "lucide-react-native";
+import MapView, { Marker } from "react-native-maps";
 import { useAuth } from "../../src/store/auth";
 import { getMyProfile } from "../../src/api/profiles";
-import { matchBloods } from "../../src/api/bloods";
+import { getNearbyHospitals } from "../../src/api/hospitals";
 import { haversineKm } from "../../src/lib/haversine";
 import DonorReminderCard from "../../src/components/DonorReminderCard";
 
@@ -31,6 +32,7 @@ type Match = {
   component?: string | null;
   applicants_count?: number;
   collected?: number;
+  is_compatible?: boolean;
   hospital: {
     id: string;
     hospital_name: string;
@@ -43,6 +45,7 @@ type Match = {
 };
 
 type MatchFilter = "all" | "urgent" | "weekend";
+type ViewMode = "list" | "map";
 
 const RADII = [
   {
@@ -195,21 +198,35 @@ export default function DonorHome() {
 
   const [filter, setFilter] = useState<MatchFilter>("all");
 
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+
   const profileQuery = useQuery({
     queryKey: ["profile"],
     queryFn: () => getMyProfile(),
     retry: false,
   });
 
-  const matchesQuery = useQuery({
-    queryKey: ["matches", radiusMeters],
-    queryFn: () => matchBloods(radiusMeters),
+  const hospitalsQuery = useQuery({
+    queryKey: ["nearby-hospitals", radiusMeters],
+    queryFn: () => getNearbyHospitals(radiusMeters),
     enabled: Boolean(profileQuery.data),
   });
 
   const profile = profileQuery.data;
 
-  const matches = (matchesQuery.data ?? []) as Match[];
+  const nearbyHospitals = hospitalsQuery.data ?? [];
+
+  const matches: Match[] = nearbyHospitals.flatMap((hospital) =>
+    hospital.blood_needs.map((blood) => ({
+      ...blood,
+      hospital: {
+        id: hospital.id,
+        hospital_name: hospital.hospital_name,
+        address: hospital.address,
+        location: hospital.location,
+      },
+    })),
+  );
 
   const filteredMatches = matches.filter((blood) => {
     if (filter === "urgent") {
@@ -222,6 +239,17 @@ export default function DonorHome() {
 
     return true;
   });
+
+  const filteredHospitalIds = new Set(
+    filteredMatches.map((blood) => blood.hospital?.id),
+  );
+
+  const mapHospitals =
+    filter === "all"
+      ? nearbyHospitals
+      : nearbyHospitals.filter((hospital) =>
+          filteredHospitalIds.has(hospital.id),
+        );
 
   const donorCoordinates = profile?.location?.coordinates as
     | [number, number]
@@ -255,7 +283,21 @@ export default function DonorHome() {
   }
 
   async function onRefresh() {
-    await Promise.all([profileQuery.refetch(), matchesQuery.refetch()]);
+    await Promise.all([profileQuery.refetch(), hospitalsQuery.refetch()]);
+  }
+
+  function openMatchDetail(blood: Match) {
+    const distance = distanceKm(blood.hospital?.location);
+
+    router.push({
+      pathname: "/(donor)/detail",
+      params: {
+        data: JSON.stringify({
+          ...blood,
+          distanceKm: distance,
+        }),
+      },
+    });
   }
 
   return (
@@ -267,7 +309,9 @@ export default function DonorHome() {
           contentContainerClassName="px-6 pb-10"
           refreshControl={
             <RefreshControl
-              refreshing={profileQuery.isFetching || matchesQuery.isFetching}
+              refreshing={
+                profileQuery.isFetching || hospitalsQuery.isFetching
+              }
               onRefresh={onRefresh}
             />
           }
@@ -369,6 +413,39 @@ export default function DonorHome() {
                 </Text>
               </View>
 
+              {/* Tampilan daftar atau peta */}
+              <View className="flex-row p-1 mt-4 border rounded-pill border-line bg-surface">
+                <Pressable
+                  onPress={() => setViewMode("list")}
+                  className={`flex-1 items-center rounded-pill py-2 ${
+                    viewMode === "list" ? "bg-primary" : "bg-surface"
+                  }`}
+                >
+                  <Text
+                    className={`font-archivo-semibold text-caption ${
+                      viewMode === "list" ? "text-white" : "text-ink"
+                    }`}
+                  >
+                    Daftar
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setViewMode("map")}
+                  className={`flex-1 items-center rounded-pill py-2 ${
+                    viewMode === "map" ? "bg-primary" : "bg-surface"
+                  }`}
+                >
+                  <Text
+                    className={`font-archivo-semibold text-caption ${
+                      viewMode === "map" ? "text-white" : "text-ink"
+                    }`}
+                  >
+                    Peta
+                  </Text>
+                </Pressable>
+              </View>
+
               {/* Radius */}
               <ScrollView
                 horizontal
@@ -431,10 +508,49 @@ export default function DonorHome() {
                 })}
               </ScrollView>
 
-              {/* List */}
-              {matchesQuery.isLoading ? (
+              {/* Hasil */}
+              {hospitalsQuery.isLoading ? (
                 <View className="items-center py-10 mt-6">
                   <ActivityIndicator color="#EC3013" />
+                </View>
+              ) : viewMode === "map" && donorCoordinates ? (
+                <View className="mt-4 overflow-hidden border rounded-[18px] border-line bg-surface">
+                  <MapView
+                    style={{ width: "100%", height: 420 }}
+                    initialRegion={{
+                      latitude: donorCoordinates[1],
+                      longitude: donorCoordinates[0],
+                      latitudeDelta: 0.2,
+                      longitudeDelta: 0.2,
+                    }}
+                    showsUserLocation
+                  >
+                    {mapHospitals.map((hospital) => {
+                      const coordinates = hospital.location.coordinates;
+                      const blood =
+                        filteredMatches.find(
+                          (item) => item.hospital?.id === hospital.id,
+                        ) ??
+                        matches.find(
+                          (item) => item.hospital?.id === hospital.id,
+                        );
+
+                      return (
+                        <Marker
+                          key={hospital.id}
+                          coordinate={{
+                            latitude: coordinates[1],
+                            longitude: coordinates[0],
+                          }}
+                          title={hospital.hospital_name}
+                          description={`${hospital.active_needs_count} kebutuhan aktif`}
+                          onCalloutPress={
+                            blood ? () => openMatchDetail(blood) : undefined
+                          }
+                        />
+                      );
+                    })}
+                  </MapView>
                 </View>
               ) : filteredMatches.length === 0 ? (
                 <View className="mt-6 rounded-[18px] border border-line bg-surface p-5">
@@ -458,17 +574,7 @@ export default function DonorHome() {
                         key={blood.id}
                         blood={blood}
                         distance={distance}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/(donor)/detail",
-                            params: {
-                              data: JSON.stringify({
-                                ...blood,
-                                distanceKm: distance,
-                              }),
-                            },
-                          })
-                        }
+                        onPress={() => openMatchDetail(blood)}
                       />
                     );
                   })}
@@ -543,6 +649,12 @@ function MatchCard({
       <Text className="mt-1 font-archivo-semibold text-caption text-ink">
         {blood.hospital?.hospital_name ?? "Fasilitas kesehatan"}
       </Text>
+
+      {blood.is_compatible === false ? (
+        <Text className="mt-2 font-archivo-semibold text-caption text-ink-muted">
+          Tidak cocok dengan golongan darahmu
+        </Text>
+      ) : null}
 
       {blood.hospital?.address ? (
         <View className="flex-row items-start mt-2">

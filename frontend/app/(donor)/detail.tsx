@@ -20,6 +20,7 @@ type Detail = {
   component?: string | null;
   applicants_count?: number;
   collected?: number;
+  is_compatible?: boolean;
   hospital: {
     hospital_name: string;
     address?: string | null;
@@ -229,6 +230,8 @@ export default function BloodDetail() {
     detail.quantity <= 0
       ? 0
       : Math.min(100, Math.round((collected / detail.quantity) * 100));
+
+  const isCompatible = detail.is_compatible !== false;
 
   function onRegister() {
     router.push({
@@ -461,10 +464,21 @@ export default function BloodDetail() {
         <View className="px-6 pt-3 pb-2 border-t border-line bg-ground">
           <Pressable
             onPress={onRegister}
-            className="items-center py-4 rounded-pill bg-primary active:bg-primary-dark"
+            disabled={!isCompatible}
+            className={`items-center rounded-pill py-4 ${
+              isCompatible
+                ? "bg-primary active:bg-primary-dark"
+                : "bg-line"
+            }`}
           >
-            <Text className="text-white font-archivo-bold text-body">
-              Daftar Donor
+            <Text
+              className={`font-archivo-bold text-body ${
+                isCompatible ? "text-white" : "text-ink-muted"
+              }`}
+            >
+              {isCompatible
+                ? "Daftar Donor"
+                : "Tidak cocok dengan golongan darahmu"}
             </Text>
           </Pressable>
         </View>
