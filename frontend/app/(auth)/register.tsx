@@ -31,6 +31,10 @@ export default function Register() {
   const [bloodType, setBloodType] = useState<BloodType>("A");
   const [rhesus, setRhesus] = useState<Rhesus>("+");
   const [address, setAddress] = useState("");
+  const [unitDonor, setUnitDonor] = useState("");
+  const [picName, setPicName] = useState("");
+  const [contact, setContact] = useState("");
+  const [hospitalType, setHospitalType] = useState("");
   const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
   const [locating, setLocating] = useState(false);
   const [agree, setAgree] = useState(false);
@@ -77,8 +81,18 @@ export default function Register() {
       Alert.alert("Lengkapi data", "Nama, email, dan kata sandi wajib diisi.");
       return;
     }
-    if (!donor && !address.trim()) {
-      Alert.alert("Lengkapi data", "Alamat fasilitas wajib diisi.");
+    if (
+      !donor &&
+      (!address.trim() ||
+        !unitDonor.trim() ||
+        !picName.trim() ||
+        !contact.trim() ||
+        !hospitalType.trim())
+    ) {
+      Alert.alert(
+        "Lengkapi data fasilitas",
+        "Jenis fasilitas, alamat, unit donor, penanggung jawab, dan kontak wajib diisi.",
+      );
       return;
     }
     if (!coordinates) {
@@ -114,6 +128,10 @@ export default function Register() {
             }
           : {
               address: address.trim(),
+              unit_donor: unitDonor.trim(),
+              pic_name: picName.trim(),
+              contact: contact.trim(),
+              hospital_type: hospitalType.trim(),
             }),
       });
       Alert.alert(
@@ -141,10 +159,16 @@ export default function Register() {
         >
           {/* Top bar */}
           <View className="h-12 flex-row items-center">
-            <Pressable onPress={() => router.back()} hitSlop={8} className="mr-3">
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={8}
+              className="mr-3"
+            >
               <Text className="text-2xl text-ink">←</Text>
             </Pressable>
-            <Text className="font-archivo-semibold text-body text-ink">Buat akun</Text>
+            <Text className="font-archivo-semibold text-body text-ink">
+              Buat akun
+            </Text>
           </View>
 
           <Text className="mt-2 font-archivo-bold text-judul leading-tight text-ink">
@@ -237,6 +261,18 @@ export default function Register() {
           ) : (
             <>
               <Text className="mb-2 font-archivo-medium text-caption text-ink">
+                Jenis fasilitas
+              </Text>
+              <TextInput
+                value={hospitalType}
+                onChangeText={setHospitalType}
+                placeholder="Contoh: Rumah Sakit, PMI, atau Klinik"
+                placeholderTextColor="#9b9797"
+                autoCapitalize="words"
+                className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+              />
+
+              <Text className="mb-2 font-archivo-medium text-caption text-ink">
                 Alamat fasilitas
               </Text>
               <TextInput
@@ -246,6 +282,42 @@ export default function Register() {
                 placeholderTextColor="#9b9797"
                 multiline
                 className="mb-5 min-h-24 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+              />
+
+              <Text className="mb-2 font-archivo-medium text-caption text-ink">
+                Unit donor
+              </Text>
+              <TextInput
+                value={unitDonor}
+                onChangeText={setUnitDonor}
+                placeholder="Contoh: Unit Donor Darah"
+                placeholderTextColor="#9b9797"
+                autoCapitalize="words"
+                className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+              />
+
+              <Text className="mb-2 font-archivo-medium text-caption text-ink">
+                Penanggung jawab
+              </Text>
+              <TextInput
+                value={picName}
+                onChangeText={setPicName}
+                placeholder="Nama penanggung jawab"
+                placeholderTextColor="#9b9797"
+                autoCapitalize="words"
+                className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+              />
+
+              <Text className="mb-2 font-archivo-medium text-caption text-ink">
+                Kontak
+              </Text>
+              <TextInput
+                value={contact}
+                onChangeText={setContact}
+                placeholder="Nomor telepon fasilitas"
+                placeholderTextColor="#9b9797"
+                keyboardType="phone-pad"
+                className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
               />
             </>
           )}
@@ -276,7 +348,9 @@ export default function Register() {
             )}
           </Pressable>
 
-          <Text className="mb-2 font-archivo-medium text-caption text-ink">Email</Text>
+          <Text className="mb-2 font-archivo-medium text-caption text-ink">
+            Email
+          </Text>
           <TextInput
             value={email}
             onChangeText={setEmail}

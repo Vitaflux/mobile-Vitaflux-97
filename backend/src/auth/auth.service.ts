@@ -66,10 +66,10 @@ export class AuthService {
         location: registerDto.location,
         isVerified: false,
         code: null,
-        unit_donor: null,
-        pic_name: null,
-        contact: null,
-        hospital_type: null,
+        unit_donor: registerDto.unit_donor!.trim(),
+        pic_name: registerDto.pic_name!.trim(),
+        contact: registerDto.contact!.trim(),
+        hospital_type: registerDto.hospital_type!.trim(),
       });
     }
 

@@ -13,7 +13,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { MapPin } from "lucide-react-native";
+import { CalendarDays, Clock3, MapPin } from "lucide-react-native";
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { createBlood, type BloodComponent } from "../../src/api/bloods";
 import { getMyHospital } from "../../src/api/hospitals";
 import { errorMessage } from "../../src/lib/errorMessage";
@@ -21,6 +24,35 @@ import type { BloodType, Rhesus } from "../../src/types/models";
 
 const GOLONGAN: BloodType[] = ["A", "B", "AB", "O"];
 const RHESUS: Rhesus[] = ["+", "-"];
+
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function dateValue(value: Date | null) {
+  if (!value) return "";
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
+function timeValue(value: Date | null) {
+  if (!value) return "";
+  return `${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+
+function dateLabel(value: Date | null) {
+  if (!value) return "Pilih tanggal";
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(value);
+}
+
+function defaultTime(hours: number) {
+  const value = new Date();
+  value.setHours(hours, 0, 0, 0);
+  return value;
+}
 
 const COMPONENTS: {
   value: BloodComponent;
@@ -57,25 +89,28 @@ export default function CreateBlood() {
   const [golongan, setGolongan] = useState<BloodType>("O");
   const [rhesus, setRhesus] = useState<Rhesus>("+");
   const [qty, setQty] = useState(5);
-  const [tanggal, setTanggal] = useState("");
-  const [jamMulai, setJamMulai] = useState("");
-  const [jamSelesai, setJamSelesai] = useState("");
+  const [tanggal, setTanggal] = useState<Date | null>(null);
+  const [jamMulai, setJamMulai] = useState<Date | null>(null);
+  const [jamSelesai, setJamSelesai] = useState<Date | null>(null);
+  const [activePicker, setActivePicker] = useState<
+    "date" | "start" | "end" | null
+  >(null);
   const [note, setNote] = useState("");
   const [urgent, setUrgent] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const dateFormatOk = /^\d{4}-\d{2}-\d{2}$/.test(tanggal);
-  const startTimeFormatOk = /^\d{2}:\d{2}$/.test(jamMulai);
-  const endTimeFormatOk = /^\d{2}:\d{2}$/.test(jamSelesai);
+  const selectedDate = dateValue(tanggal);
+  const selectedStartTime = timeValue(jamMulai);
+  const selectedEndTime = timeValue(jamSelesai);
 
   const schedule =
-    dateFormatOk && startTimeFormatOk
-      ? new Date(`${tanggal}T${jamMulai}:00`)
+    selectedDate && selectedStartTime
+      ? new Date(`${selectedDate}T${selectedStartTime}:00`)
       : null;
 
   const scheduleEnd =
-    dateFormatOk && endTimeFormatOk
-      ? new Date(`${tanggal}T${jamSelesai}:00`)
+    selectedDate && selectedEndTime
+      ? new Date(`${selectedDate}T${selectedEndTime}:00`)
       : null;
 
   const scheduleValid =
@@ -90,6 +125,17 @@ export default function CreateBlood() {
   const selectedComponent =
     COMPONENTS.find((item) => item.value === component)?.label ?? "Whole blood";
 
+  function onPickerChange(event: DateTimePickerEvent, value?: Date) {
+    const picker = activePicker;
+    setActivePicker(null);
+
+    if (event.type === "dismissed" || !value || !picker) return;
+
+    if (picker === "date") setTanggal(value);
+    if (picker === "start") setJamMulai(value);
+    if (picker === "end") setJamSelesai(value);
+  }
+
   async function onSubmit() {
     if (!title.trim()) {
       Alert.alert(
@@ -100,10 +146,10 @@ export default function CreateBlood() {
       return;
     }
 
-    if (!dateFormatOk || !startTimeFormatOk || !endTimeFormatOk) {
+    if (!selectedDate || !selectedStartTime || !selectedEndTime) {
       Alert.alert(
         "Jadwal belum lengkap",
-        "Isi tanggal dengan format YYYY-MM-DD dan jam dengan format HH:MM.",
+        "Pilih tanggal, jam mulai, dan jam selesai terlebih dahulu.",
       );
 
       return;
@@ -127,8 +173,8 @@ export default function CreateBlood() {
         rhesus,
         quantity: qty,
         component,
-        schedule: `${tanggal}T${jamMulai}:00`,
-        schedule_end: `${tanggal}T${jamSelesai}:00`,
+        schedule: `${selectedDate}T${selectedStartTime}:00`,
+        schedule_end: `${selectedDate}T${selectedEndTime}:00`,
         note: note.trim() || null,
         status_blood: urgent ? "urgent" : "normal",
       });
@@ -256,45 +302,60 @@ export default function CreateBlood() {
           {/* Jadwal */}
           <Label>Tanggal</Label>
 
-          <TextInput
-            value={tanggal}
-            onChangeText={setTanggal}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#9B9797"
-            keyboardType="numbers-and-punctuation"
-            maxLength={10}
-            className={inputCls}
+          <PickerButton
+            icon={<CalendarDays color="#605D5D" size={20} />}
+            value={dateLabel(tanggal)}
+            selected={tanggal !== null}
+            onPress={() => setActivePicker("date")}
           />
+
+          {activePicker === "date" ? (
+            <DateTimePicker
+              value={tanggal || new Date()}
+              mode="date"
+              display="default"
+              minimumDate={new Date()}
+              onChange={onPickerChange}
+            />
+          ) : null}
 
           <View className="flex-row gap-3">
             <View className="flex-1">
               <Label>Jam mulai</Label>
 
-              <TextInput
-                value={jamMulai}
-                onChangeText={setJamMulai}
-                placeholder="HH:MM"
-                placeholderTextColor="#9B9797"
-                keyboardType="numbers-and-punctuation"
-                maxLength={5}
-                className={inputCls}
+              <PickerButton
+                icon={<Clock3 color="#605D5D" size={20} />}
+                value={selectedStartTime || "Pilih jam"}
+                selected={jamMulai !== null}
+                onPress={() => setActivePicker("start")}
               />
             </View>
 
             <View className="flex-1">
               <Label>Jam selesai</Label>
 
-              <TextInput
-                value={jamSelesai}
-                onChangeText={setJamSelesai}
-                placeholder="HH:MM"
-                placeholderTextColor="#9B9797"
-                keyboardType="numbers-and-punctuation"
-                maxLength={5}
-                className={inputCls}
+              <PickerButton
+                icon={<Clock3 color="#605D5D" size={20} />}
+                value={selectedEndTime || "Pilih jam"}
+                selected={jamSelesai !== null}
+                onPress={() => setActivePicker("end")}
               />
             </View>
           </View>
+
+          {activePicker === "start" || activePicker === "end" ? (
+            <DateTimePicker
+              value={
+                activePicker === "start"
+                  ? jamMulai || defaultTime(8)
+                  : jamSelesai || defaultTime(10)
+              }
+              mode="time"
+              display="default"
+              is24Hour
+              onChange={onPickerChange}
+            />
+          ) : null}
 
           {/* Lokasi */}
           <Label>Lokasi pengambilan</Label>
@@ -378,8 +439,8 @@ export default function CreateBlood() {
             </Text>
 
             <Text className="mt-1 font-archivo text-caption text-ink-muted">
-              {dateFormatOk && startTimeFormatOk && endTimeFormatOk
-                ? `${tanggal} · ${jamMulai}–${jamSelesai}`
+              {selectedDate && selectedStartTime && selectedEndTime
+                ? `${dateLabel(tanggal)} · ${selectedStartTime}–${selectedEndTime}`
                 : "Jadwal belum lengkap"}
             </Text>
 
@@ -432,6 +493,34 @@ function Label({ children }: { children: ReactNode }) {
     <Text className="mt-5 mb-2 font-archivo-medium text-caption text-ink">
       {children}
     </Text>
+  );
+}
+
+function PickerButton({
+  icon,
+  value,
+  selected,
+  onPress,
+}: {
+  icon: ReactNode;
+  value: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="flex-row items-center rounded-card border border-line bg-surface px-4 py-[14px]"
+    >
+      {icon}
+      <Text
+        className={`ml-3 flex-1 font-archivo text-body ${
+          selected ? "text-ink" : "text-ink-muted"
+        }`}
+      >
+        {value}
+      </Text>
+    </Pressable>
   );
 }
 
