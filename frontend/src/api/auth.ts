@@ -13,6 +13,10 @@ export interface RegisterInput {
   blood_type?: "A" | "B" | "AB" | "O";
   rhesus?: "+" | "-";
   address?: string;
+  unit_donor?: string;
+  pic_name?: string;
+  contact?: string;
+  hospital_type?: string;
 }
 
 export interface LoginResult {

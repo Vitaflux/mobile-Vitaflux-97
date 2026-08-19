@@ -45,4 +45,24 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   address?: string;
+
+  @ValidateIf((value: RegisterDto) => value.role === 'facility')
+  @IsString()
+  @IsNotEmpty()
+  unit_donor?: string;
+
+  @ValidateIf((value: RegisterDto) => value.role === 'facility')
+  @IsString()
+  @IsNotEmpty()
+  pic_name?: string;
+
+  @ValidateIf((value: RegisterDto) => value.role === 'facility')
+  @IsString()
+  @IsNotEmpty()
+  contact?: string;
+
+  @ValidateIf((value: RegisterDto) => value.role === 'facility')
+  @IsString()
+  @IsNotEmpty()
+  hospital_type?: string;
 }
