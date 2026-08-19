@@ -21,7 +21,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.ningrumzy.vitaflux"
+      "package": "com.ningrumzy.vitaflux",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",

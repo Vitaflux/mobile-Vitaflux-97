@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "779639022823",
+    "project_id": "vitaflux-9695d",
+    "storage_bucket": "vitaflux-9695d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:779639022823:android:590a076dfb7b73b95dae42",
+        "android_client_info": {
+          "package_name": "com.ningrumzy.vitaflux"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC15KQGKEnsMezX7Aa_jJtAXo79gT5V1cc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
