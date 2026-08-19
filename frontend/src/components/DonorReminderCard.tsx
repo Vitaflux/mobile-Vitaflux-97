@@ -96,14 +96,14 @@ export default function DonorReminderCard() {
         <Text className="mt-1 leading-5 font-archivo text-caption text-ink-muted">
           {reminder
             ? formatReminderDate(reminder.scheduledFor)
-            : "Dapatkan notifikasi saat kamu sudah boleh donor lagi."}
+            : "Atur notifikasi untuk jadwal donor yang telah dikonfirmasi."}
         </Text>
 
         {reminder ? (
           <Text className="mt-1 font-archivo-semibold text-caption text-primary-dark">
             {reminder.timing === "h-3"
               ? "3 hari sebelum jadwal"
-              : "Pada hari kelayakan"}
+              : "Pada jadwal donor"}
           </Text>
         ) : null}
       </View>

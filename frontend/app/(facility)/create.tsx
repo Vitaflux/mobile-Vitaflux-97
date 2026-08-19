@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -125,15 +126,44 @@ export default function CreateBlood() {
   const selectedComponent =
     COMPONENTS.find((item) => item.value === component)?.label ?? "Darah utuh";
 
+  function openPicker(picker: "date" | "start" | "end") {
+    // iOS tidak memanggil onChange bila pengguna langsung menerima nilai
+    // bawaan spinner. Simpan nilai awal saat picker dibuka agar label tetap
+    // terisi meskipun rodanya tidak digeser.
+    if (picker === "date" && !tanggal) {
+      setTanggal(new Date());
+    }
+
+    if (picker === "start" && !jamMulai) {
+      setJamMulai(defaultTime(8));
+    }
+
+    if (picker === "end" && !jamSelesai) {
+      setJamSelesai(defaultTime(10));
+    }
+
+    setActivePicker(picker);
+  }
+
   function onPickerChange(event: DateTimePickerEvent, value?: Date) {
     const picker = activePicker;
-    setActivePicker(null);
 
-    if (event.type === "dismissed" || !value || !picker) return;
+    if (event.type === "dismissed") {
+      setActivePicker(null);
+      return;
+    }
+
+    if (!value || !picker) return;
 
     if (picker === "date") setTanggal(value);
     if (picker === "start") setJamMulai(value);
     if (picker === "end") setJamSelesai(value);
+
+    // Dialog Android selesai setelah satu pilihan. Spinner iOS harus tetap
+    // terbuka agar roda jam dapat digeser tanpa otomatis tertutup.
+    if (Platform.OS !== "ios") {
+      setActivePicker(null);
+    }
   }
 
   async function onSubmit() {
@@ -308,17 +338,25 @@ export default function CreateBlood() {
             icon={<CalendarDays color="#605D5D" size={20} />}
             value={dateLabel(tanggal)}
             selected={tanggal !== null}
-            onPress={() => setActivePicker("date")}
+            onPress={() => openPicker("date")}
           />
 
           {activePicker === "date" ? (
             <DateTimePicker
               value={tanggal || new Date()}
               mode="date"
-              display="default"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              themeVariant="light"
+              textColor="#201E1D"
+              accentColor="#EC3013"
+              style={Platform.OS === "ios" ? { height: 140 } : undefined}
               minimumDate={new Date()}
               onChange={onPickerChange}
             />
+          ) : null}
+
+          {activePicker === "date" && Platform.OS === "ios" ? (
+            <PickerDoneButton onPress={() => setActivePicker(null)} />
           ) : null}
 
           <View className="flex-row gap-3">
@@ -329,7 +367,7 @@ export default function CreateBlood() {
                 icon={<Clock3 color="#605D5D" size={20} />}
                 value={selectedStartTime || "Pilih jam"}
                 selected={jamMulai !== null}
-                onPress={() => setActivePicker("start")}
+                onPress={() => openPicker("start")}
               />
             </View>
 
@@ -340,7 +378,7 @@ export default function CreateBlood() {
                 icon={<Clock3 color="#605D5D" size={20} />}
                 value={selectedEndTime || "Pilih jam"}
                 selected={jamSelesai !== null}
-                onPress={() => setActivePicker("end")}
+                onPress={() => openPicker("end")}
               />
             </View>
           </View>
@@ -353,10 +391,19 @@ export default function CreateBlood() {
                   : jamSelesai || defaultTime(10)
               }
               mode="time"
-              display="default"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              themeVariant="light"
+              textColor="#201E1D"
+              accentColor="#EC3013"
+              style={Platform.OS === "ios" ? { height: 140 } : undefined}
               is24Hour
               onChange={onPickerChange}
             />
+          ) : null}
+
+          {(activePicker === "start" || activePicker === "end") &&
+          Platform.OS === "ios" ? (
+            <PickerDoneButton onPress={() => setActivePicker(null)} />
           ) : null}
 
           {/* Lokasi */}
@@ -521,6 +568,19 @@ function PickerButton({
         }`}
       >
         {value}
+      </Text>
+    </Pressable>
+  );
+}
+
+function PickerDoneButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className="self-end px-4 py-2 mt-1 rounded-pill bg-primary"
+    >
+      <Text className="text-white font-archivo-semibold text-caption">
+        Selesai
       </Text>
     </Pressable>
   );

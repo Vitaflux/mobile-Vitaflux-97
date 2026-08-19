@@ -12,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, LogOut, MapPin, ShieldCheck } from "lucide-react-native";
+import { Building2, LogOut, MapPin } from "lucide-react-native";
 import { getMyHospital, updateMyHospital } from "../../src/api/hospitals";
 import { useAuth } from "../../src/store/auth";
 import { useState } from "react";
@@ -391,16 +391,6 @@ export default function FacilityProfile() {
                     <Text className="font-archivo-bold text-subjudul text-ink">
                       {hospital.hospital_name}
                     </Text>
-
-                    <View className="flex-row items-center self-start px-3 py-1 mt-2 rounded-pill bg-primary-soft">
-                      <ShieldCheck color="#A31B0A" size={14} />
-
-                      <Text className="ml-1 font-archivo-bold text-overline tracking-overline text-primary-dark">
-                        {hospital.isVerified
-                          ? "TERVERIFIKASI"
-                          : "BELUM TERVERIFIKASI"}
-                      </Text>
-                    </View>
                   </View>
                 </View>
 

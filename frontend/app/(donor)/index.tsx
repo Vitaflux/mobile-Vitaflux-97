@@ -15,6 +15,7 @@ import { MapPin } from "lucide-react-native";
 import MapView, { Marker } from "react-native-maps";
 import { useAuth } from "../../src/store/auth";
 import { getMyProfile } from "../../src/api/profiles";
+import { myRequests } from "../../src/api/requests";
 import {
   getNearbyHospitals,
   type NearbyHospital,
@@ -100,6 +101,9 @@ const BULAN = [
   "Des",
 ];
 
+const ELIGIBILITY_WINDOW_DAYS = 90;
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
 const COMPONENT_LABELS: Record<string, string> = {
   whole_blood: "Whole blood",
   plasma: "Plasma",
@@ -184,6 +188,31 @@ function daysSince(value?: string | null) {
   );
 }
 
+function eligibilityFromLastDonor(value?: string | null) {
+  if (!value) {
+    return { isEligible: true, remainingDays: 0 };
+  }
+
+  const lastDonor = new Date(value);
+
+  if (Number.isNaN(lastDonor.getTime())) {
+    return { isEligible: true, remainingDays: 0 };
+  }
+
+  const eligibleAt = new Date(lastDonor);
+  eligibleAt.setUTCDate(eligibleAt.getUTCDate() + ELIGIBILITY_WINDOW_DAYS);
+
+  const remainingMilliseconds = eligibleAt.getTime() - Date.now();
+
+  return {
+    isEligible: remainingMilliseconds <= 0,
+    remainingDays:
+      remainingMilliseconds <= 0
+        ? 0
+        : Math.ceil(remainingMilliseconds / MILLISECONDS_PER_DAY),
+  };
+}
+
 function isWeekend(schedule: string) {
   const date = new Date(schedule);
 
@@ -213,6 +242,12 @@ export default function DonorHome() {
     queryKey: ["nearby-hospitals", radiusMeters],
     queryFn: () => getNearbyHospitals(radiusMeters),
     enabled: Boolean(profileQuery.data),
+    refetchInterval: 5000,
+  });
+
+  const completedRequestsQuery = useQuery({
+    queryKey: ["my-requests", "done"],
+    queryFn: () => myRequests("done"),
   });
 
   const profile = profileQuery.data;
@@ -255,12 +290,34 @@ export default function DonorHome() {
         );
 
   const donorCoordinates = profile?.location?.coordinates as
-    | [number, number]
-    | undefined;
+    [number, number] | undefined;
 
-  const lastDonorText = formatLastDonor(profile?.last_donor);
+  const latestCompletedAt = (completedRequestsQuery.data ?? []).reduce<
+    string | null
+  >((latest, request) => {
+    const checkedInAt = request.checked_in_at;
 
-  const daysAfterDonor = daysSince(profile?.last_donor);
+    if (typeof checkedInAt !== "string") {
+      return latest;
+    }
+
+    const checkedInTime = new Date(checkedInAt).getTime();
+    const latestTime = latest ? new Date(latest).getTime() : 0;
+
+    if (!Number.isFinite(checkedInTime) || checkedInTime <= latestTime) {
+      return latest;
+    }
+
+    return checkedInAt;
+  }, null);
+
+  const lastDonorAt = latestCompletedAt ?? profile?.last_donor;
+
+  const lastDonorText = formatLastDonor(lastDonorAt);
+
+  const daysAfterDonor = daysSince(lastDonorAt);
+
+  const currentEligibility = eligibilityFromLastDonor(lastDonorAt);
 
   const noProfile = profileQuery.isError;
 
@@ -286,7 +343,11 @@ export default function DonorHome() {
   }
 
   async function onRefresh() {
-    await Promise.all([profileQuery.refetch(), hospitalsQuery.refetch()]);
+    await Promise.all([
+      profileQuery.refetch(),
+      hospitalsQuery.refetch(),
+      completedRequestsQuery.refetch(),
+    ]);
   }
 
   function openMatchDetail(blood: Match) {
@@ -313,7 +374,9 @@ export default function DonorHome() {
           refreshControl={
             <RefreshControl
               refreshing={
-                profileQuery.isFetching || hospitalsQuery.isFetching
+                profileQuery.isFetching ||
+                hospitalsQuery.isFetching ||
+                completedRequestsQuery.isFetching
               }
               onRefresh={onRefresh}
             />
@@ -370,22 +433,29 @@ export default function DonorHome() {
               {/* Kelayakan */}
               <View
                 className={`mt-6 rounded-[18px] border p-5 ${
-                  profile?.eligibility.is_eligible
+                  currentEligibility.isEligible
                     ? "border-primary bg-primary-soft"
                     : "border-line bg-surface"
                 }`}
               >
                 <Text
                   className={`font-archivo-black text-subjudul ${
-                    profile?.eligibility.is_eligible
+                    currentEligibility.isEligible
                       ? "text-primary-dark"
                       : "text-ink"
                   }`}
                 >
-                  {profile?.eligibility.is_eligible
+                  {currentEligibility.isEligible
                     ? "Kamu boleh donor sekarang"
-                    : `Boleh donor lagi dalam ${profile?.eligibility.remaining_days} hari`}
+                    : "Kamu tidak boleh donor sekarang"}
                 </Text>
+
+                {!currentEligibility.isEligible ? (
+                  <Text className="mt-1 font-archivo-semibold text-caption text-primary-dark">
+                    Boleh donor lagi dalam {currentEligibility.remainingDays}{" "}
+                    hari
+                  </Text>
+                ) : null}
 
                 <Text className="mt-1 font-archivo text-caption text-ink-muted">
                   Golongan {profile?.blood_type}
@@ -406,13 +476,13 @@ export default function DonorHome() {
               <DonorReminderCard />
 
               {/* Heading */}
-              <View className="flex-row items-baseline justify-between mt-7">
+              <View className="mt-7">
                 <Text className="font-archivo-bold text-judul text-ink">
                   Rumah sakit di sekitarmu
                 </Text>
 
-                <Text className="font-archivo text-caption text-ink-muted">
-                  {mapHospitals.length} rumah sakit
+                <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                  {mapHospitals.length} rumah sakit ditemukan
                 </Text>
               </View>
 
@@ -562,7 +632,8 @@ export default function DonorHome() {
                   </Text>
 
                   <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                    Coba pilih radius yang lebih luas atau ubah filter kebutuhan.
+                    Coba pilih radius yang lebih luas atau ubah filter
+                    kebutuhan.
                   </Text>
                 </View>
               ) : (
@@ -606,19 +677,9 @@ function HospitalCard({
 }) {
   return (
     <View className="rounded-[18px] border border-line bg-surface p-4">
-      <View className="flex-row items-start justify-between gap-3">
-        <Text className="flex-1 font-archivo-bold text-body text-ink">
-          {hospital.hospital_name}
-        </Text>
-
-        {hospital.isVerified ? (
-          <View className="px-3 py-1 rounded-pill bg-primary-soft">
-            <Text className="font-archivo-bold text-overline text-primary-dark">
-              TERVERIFIKASI
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      <Text className="font-archivo-bold text-body text-ink">
+        {hospital.hospital_name}
+      </Text>
 
       {hospital.address ? (
         <View className="flex-row items-start mt-2">

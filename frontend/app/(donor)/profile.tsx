@@ -14,12 +14,12 @@ import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import * as Location from "expo-location";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, LogOut, MapPin } from "lucide-react-native";
+import { Bell, CalendarDays, LogOut, MapPin } from "lucide-react-native";
 import { useAuth } from "../../src/store/auth";
 import { getMyProfile, updateMyProfile } from "../../src/api/profiles";
+import { myRequests } from "../../src/api/requests";
 import { errorMessage } from "../../src/lib/errorMessage";
 import type { BloodType, Rhesus } from "../../src/types/models";
-import { Bell } from "lucide-react-native";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -83,13 +83,18 @@ export default function DonorProfile() {
 
   const [showBirthDatePicker, setShowBirthDatePicker] = useState(false);
 
-  const [showLastDonationPicker, setShowLastDonationPicker] = useState(false);
-
   const profileQuery = useQuery({
     queryKey: profileKey,
     queryFn: getMyProfile,
     enabled: Boolean(user),
     retry: false,
+    refetchOnMount: "always",
+  });
+
+  const completedRequestsQuery = useQuery({
+    queryKey: ["my-requests", "done"],
+    queryFn: () => myRequests("done"),
+    enabled: Boolean(user),
     refetchOnMount: "always",
   });
 
@@ -102,8 +107,6 @@ export default function DonorProfile() {
   const [weight, setWeight] = useState("");
 
   const [city, setCity] = useState("");
-
-  const [lastDonation, setLastDonation] = useState("");
 
   const [radiusKm, setRadiusKm] = useState(10);
 
@@ -123,7 +126,6 @@ export default function DonorProfile() {
     setBirthDate("");
     setWeight("");
     setCity("");
-    setLastDonation("");
     setRadiusKm(10);
     setCoordinates(null);
   }, [user?.email]);
@@ -145,12 +147,29 @@ export default function DonorProfile() {
 
     setCity(profile.city ?? "");
 
-    setLastDonation(dateInput(profile.last_donor));
-
     setRadiusKm(profile.notify_radius_km ?? 10);
 
     setCoordinates(profile.location.coordinates);
   }, [profileQuery.data]);
+
+  const latestCompletedAt = (completedRequestsQuery.data ?? []).reduce<
+    string | null
+  >((latest, request) => {
+    const checkedInAt = request.checked_in_at;
+
+    if (typeof checkedInAt !== "string") return latest;
+
+    const checkedInTime = new Date(checkedInAt).getTime();
+    const latestTime = latest ? new Date(latest).getTime() : 0;
+
+    return Number.isFinite(checkedInTime) && checkedInTime > latestTime
+      ? checkedInAt
+      : latest;
+  }, null);
+
+  const lastDonation = dateInput(
+    latestCompletedAt ?? profileQuery.data?.last_donor,
+  );
 
   const eligibility = useMemo(() => {
     const elapsed = daysSince(lastDonation);
@@ -168,7 +187,7 @@ export default function DonorProfile() {
     };
   }, [lastDonation]);
 
-  const totalDonations = profileQuery.data?.stats?.total_donations ?? 0;
+  const totalDonations = completedRequestsQuery.data?.length ?? 0;
 
   const memberSince = profileQuery.data?.stats?.member_since_year;
 
@@ -210,19 +229,6 @@ export default function DonorProfile() {
     setBirthDate(dateInput(selectedDate.toISOString()));
   }
 
-  function onLastDonationChange(
-    event: DateTimePickerEvent,
-    selectedDate?: Date,
-  ) {
-    setShowLastDonationPicker(false);
-
-    if (event.type === "dismissed" || !selectedDate) {
-      return;
-    }
-
-    setLastDonation(dateInput(selectedDate.toISOString()));
-  }
-
   async function onSave() {
     if (!coordinates) {
       Alert.alert(
@@ -235,12 +241,6 @@ export default function DonorProfile() {
 
     if (!validOptionalDate(birthDate)) {
       Alert.alert("Tanggal lahir tidak valid", "Gunakan format YYYY-MM-DD.");
-
-      return;
-    }
-
-    if (!validOptionalDate(lastDonation)) {
-      Alert.alert("Tanggal donor tidak valid", "Gunakan format YYYY-MM-DD.");
 
       return;
     }
@@ -272,7 +272,6 @@ export default function DonorProfile() {
         birth_date: birthDate || null,
         weight_kg: parsedWeight,
         city: city.trim() || null,
-        last_donor: lastDonation || null,
         notify_radius_km: radiusKm,
       });
 
@@ -285,6 +284,9 @@ export default function DonorProfile() {
         }),
         queryClient.invalidateQueries({
           queryKey: ["matching-bloods"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["my-requests"],
         }),
       ]);
 
@@ -317,7 +319,7 @@ export default function DonorProfile() {
     }
   }
 
-  if (profileQuery.isLoading) {
+  if (profileQuery.isLoading || completedRequestsQuery.isLoading) {
     return (
       <View className="items-center justify-center flex-1 bg-ground">
         <ActivityIndicator color="#EC3013" />
@@ -417,7 +419,7 @@ export default function DonorProfile() {
             ) : eligibility.eligible ? (
               <>
                 <Text className="font-archivo-black text-subjudul text-primary-dark">
-                  Boleh donor sekarang
+                  Kamu boleh donor sekarang
                 </Text>
 
                 <Text className="mt-1 font-archivo text-caption text-ink-muted">
@@ -427,11 +429,15 @@ export default function DonorProfile() {
             ) : (
               <>
                 <Text className="font-archivo-black text-subjudul text-ink">
+                  Kamu tidak boleh donor sekarang
+                </Text>
+
+                <Text className="mt-1 font-archivo-semibold text-caption text-primary-dark">
                   Boleh donor lagi dalam {eligibility.remaining} hari
                 </Text>
 
                 <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                  {eligibility.elapsed} dari {MIN_DAYS} hari berlalu.
+                  {eligibility.elapsed} dari {MIN_DAYS} hari telah berlalu.
                 </Text>
               </>
             )}
@@ -530,15 +536,11 @@ export default function DonorProfile() {
           />
 
           {/* Last donation */}
-          {/* Last donation */}
           <View className="h-4" />
 
           <Label>Tanggal donor terakhir</Label>
 
-          <Pressable
-            onPress={() => setShowLastDonationPicker(true)}
-            className="flex-row items-center rounded-card border border-line bg-surface px-4 py-[14px]"
-          >
+          <View className="flex-row items-center rounded-card border border-line bg-surface px-4 py-[14px]">
             <CalendarDays color="#605D5D" size={20} />
 
             <Text
@@ -546,32 +548,13 @@ export default function DonorProfile() {
                 lastDonation ? "text-ink" : "text-ink-muted"
               }`}
             >
-              {lastDonation || "Pilih tanggal donor terakhir"}
+              {lastDonation || "Belum ada donasi yang selesai"}
             </Text>
-          </Pressable>
+          </View>
 
-          {lastDonation ? (
-            <Pressable
-              onPress={() => setLastDonation("")}
-              className="self-start px-1 py-2 mt-1"
-            >
-              <Text className="font-archivo-semibold text-caption text-primary-dark">
-                Kosongkan tanggal
-              </Text>
-            </Pressable>
-          ) : null}
-
-          {showLastDonationPicker ? (
-            <DateTimePicker
-              value={
-                lastDonation ? new Date(`${lastDonation}T12:00:00`) : new Date()
-              }
-              mode="date"
-              display="default"
-              maximumDate={new Date()}
-              onChange={onLastDonationChange}
-            />
-          ) : null}
+          <Text className="mt-2 font-archivo text-caption text-ink-muted">
+            Diperbarui otomatis setelah donasi diselesaikan oleh faskes.
+          </Text>
 
           {/* Radius */}
           <View className="h-4" />
@@ -629,8 +612,7 @@ export default function DonorProfile() {
 
           {coordinates ? (
             <Text className="mt-2 font-archivo text-caption text-ink-muted">
-              Tersimpan: {coordinates[1].toFixed(5)},{" "}
-              {coordinates[0].toFixed(5)} (lat, lng)
+              Lokasi berhasil tersimpan.
             </Text>
           ) : null}
 
