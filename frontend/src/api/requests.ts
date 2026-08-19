@@ -4,7 +4,7 @@ import type { DonorRequest } from "../types/models";
 export type CheckInInput = {
   qr_token?: string;
   code?: string;
-  volume_ml?: number;
+  volume_ml: number;
 };
 
 // Donor daftar ke kebutuhan.
@@ -58,15 +58,17 @@ export async function checkInRequest(input: CheckInInput) {
 }
 
 // Kompatibilitas untuk pemanggilan scanner QR lama.
-export async function checkInByQr(qrToken: string) {
+export async function checkInByQr(qrToken: string, volumeMl: number) {
   return checkInRequest({
     qr_token: qrToken,
+    volume_ml: volumeMl,
   });
 }
 
 // Facility: check-in menggunakan kode VF-XXXX.
-export async function checkInByCode(code: string) {
+export async function checkInByCode(code: string, volumeMl: number) {
   return checkInRequest({
     code,
+    volume_ml: volumeMl,
   });
 }

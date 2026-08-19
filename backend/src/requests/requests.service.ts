@@ -289,6 +289,17 @@ export class RequestsService {
       throw new BadRequestException('QR token or code is required');
     }
 
+    if (
+      volumeMl === undefined ||
+      !Number.isInteger(volumeMl) ||
+      volumeMl < 1 ||
+      volumeMl > 2000
+    ) {
+      throw new BadRequestException(
+        'Donation volume is required and must be between 1 and 2000 ml',
+      );
+    }
+
     const hospital = await this.hospitalModel
       .where('user_id', new ObjectId(userId))
       .first();
@@ -325,7 +336,7 @@ export class RequestsService {
     await this.requestModel.where('_id', donorRequest._id).update({
       status: 'done',
       checked_in_at: checkedInAt,
-      volume_ml: volumeMl ?? null,
+      volume_ml: volumeMl,
     });
 
     return {
@@ -339,7 +350,7 @@ export class RequestsService {
         qr_token: donorRequest.qr_token,
         code: donorRequest.code ?? null,
         checked_in_at: checkedInAt,
-        volume_ml: volumeMl ?? null,
+        volume_ml: volumeMl,
       },
     };
   }
@@ -398,6 +409,7 @@ export class RequestsService {
                 status_blood: blood.status_blood,
                 schedule: blood.schedule,
                 title: blood.title ?? null,
+                component: blood.component ?? null,
               }
             : null,
           hospital: hospital

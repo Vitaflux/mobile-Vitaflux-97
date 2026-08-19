@@ -1,9 +1,10 @@
 import { Type } from 'class-transformer';
 import {
+  IsDefined,
   IsInt,
-  IsOptional,
   IsString,
   IsUUID,
+  Max,
   Matches,
   Min,
   ValidateIf,
@@ -27,9 +28,10 @@ export class CheckInRequestDto {
   })
   code?: string;
 
-  @IsOptional()
+  @IsDefined({ message: 'Donation volume is required' })
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  volume_ml?: number;
+  @Max(2000)
+  volume_ml!: number;
 }
