@@ -14,6 +14,8 @@ import { useAuth } from "../../src/store/auth";
 import { errorMessage } from "../../src/lib/errorMessage";
 import { registerPushTokenForCurrentDevice } from "../../src/lib/pushNotifications";
 import { useQueryClient } from "@tanstack/react-query";
+import Constants from "expo-constants";
+import { GOOGLE_WEB_CLIENT_ID } from "../../src/config/env";
 
 export default function Login() {
   const login = useAuth((s) => s.login);
@@ -23,6 +25,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const loginWithGoogle = useAuth((s) => s.loginWithGoogle);
 
   async function onSubmit() {
     const normalizedEmail = email.trim().toLowerCase();
@@ -75,6 +79,64 @@ export default function Login() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onGoogleLogin() {
+    if (Constants.appOwnership === "expo") {
+      Alert.alert(
+        "Development build diperlukan",
+        "Google Login memakai modul native dan tidak dapat dijalankan melalui Expo Go.",
+      );
+      return;
+    }
+    if (!GOOGLE_WEB_CLIENT_ID) {
+      Alert.alert(
+        "Google Login belum dikonfigurasi",
+        "Isi EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID lalu build ulang aplikasi.",
+      );
+      return;
+    }
+
+    setGoogleLoading(true);
+    try {
+      const { GoogleSignin } =
+        await import("@react-native-google-signin/google-signin");
+      GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+      await GoogleSignin.hasPlayServices({
+        showPlayServicesUpdateDialog: true,
+      });
+      const response = await GoogleSignin.signIn();
+      if (response.type !== "success") return;
+      if (!response.data.idToken) {
+        throw new Error("Google tidak mengirim ID token.");
+      }
+
+      queryClient.clear();
+      const next = await loginWithGoogle(response.data.idToken);
+      if (next === "onboarding") {
+        router.push("/(auth)/google-onboarding");
+        return;
+      }
+
+      const user = useAuth.getState().user;
+      if (!user)
+        throw new Error("Data pengguna tidak ditemukan setelah login.");
+      if (user.role === "donor") {
+        try {
+          await registerPushTokenForCurrentDevice();
+        } catch (pushError) {
+          console.warn("Push token belum dapat didaftarkan:", pushError);
+        }
+      }
+      router.replace(user.role === "facility" ? "/(facility)" : "/(donor)");
+    } catch (error) {
+      Alert.alert(
+        "Google Login gagal",
+        errorMessage(error, "Silakan coba lagi."),
+      );
+    } finally {
+      setGoogleLoading(false);
     }
   }
 
@@ -159,12 +221,17 @@ export default function Login() {
           </View>
 
           <Pressable
-            onPress={() => Alert.alert("Google", "Login Google menyusul.")}
+            onPress={onGoogleLogin}
+            disabled={googleLoading}
             className="items-center justify-center py-4 border rounded-pill border-line"
           >
-            <Text className="font-archivo-semibold text-body text-ink">
-              Lanjut dengan Google
-            </Text>
+            {googleLoading ? (
+              <ActivityIndicator color="#EC3013" />
+            ) : (
+              <Text className="font-archivo-semibold text-body text-ink">
+                Lanjut dengan Google
+              </Text>
+            )}
           </Pressable>
 
           <View className="flex-row justify-center mt-6">
