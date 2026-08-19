@@ -339,6 +339,12 @@ export class RequestsService {
       volume_ml: volumeMl,
     });
 
+    await this.userProfileModel
+      .where('_id', donorRequest.user_Profiles_id)
+      .update({
+        last_donor: checkedInAt,
+      });
+
     return {
       success: true,
       data: {

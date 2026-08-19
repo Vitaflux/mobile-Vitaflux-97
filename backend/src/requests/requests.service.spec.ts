@@ -50,6 +50,7 @@ describe('RequestsService check-in flow', () => {
     };
 
     const update = jest.fn().mockResolvedValue(undefined);
+    const profileUpdate = jest.fn().mockResolvedValue(undefined);
 
     const requestModel = {
       where: jest.fn((column: string) =>
@@ -71,10 +72,14 @@ describe('RequestsService check-in flow', () => {
       })),
     };
 
+    const userProfileModel = {
+      where: jest.fn(() => ({ update: profileUpdate })),
+    };
+
     const service = new RequestsService(
       requestModel as unknown as Request,
       bloodModel as unknown as Blood,
-      {} as UserProfile,
+      userProfileModel as unknown as UserProfile,
       hospitalModel as unknown as Hospital,
       {} as User,
       {
@@ -82,7 +87,7 @@ describe('RequestsService check-in flow', () => {
       } as unknown as NotificationsService,
     );
 
-    return { service, update, requestModel };
+    return { service, update, profileUpdate, requestModel };
   }
 
   beforeEach(() => {
@@ -95,7 +100,7 @@ describe('RequestsService check-in flow', () => {
   });
 
   it('allows a confirmed donor to check in before the planned start time', async () => {
-    const { service, update } = createService(
+    const { service, update, profileUpdate } = createService(
       new Date('2026-08-18T09:00:00.000Z'),
       new Date('2026-08-18T15:00:00.000Z'),
     );
@@ -112,6 +117,7 @@ describe('RequestsService check-in flow', () => {
       checked_in_at: now,
       volume_ml: 350,
     });
+    expect(profileUpdate).toHaveBeenCalledWith({ last_donor: now });
   });
 
   it('allows a confirmed donor to finish after the planned end time', async () => {

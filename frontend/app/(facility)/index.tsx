@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   View,
   Text,
@@ -5,14 +6,16 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../src/store/auth";
-import { listBloods } from "../../src/api/bloods";
+import { closeBlood, listBloods } from "../../src/api/bloods";
 import { getMyHospital } from "../../src/api/hospitals";
+import { errorMessage } from "../../src/lib/errorMessage";
 
 type FacilityBlood = {
   id: string;
@@ -85,8 +88,10 @@ function formatSchedule(startValue: string, endValue?: string | null) {
 }
 
 export default function FacilityDashboard() {
+  const queryClient = useQueryClient();
   const user = useAuth((state) => state.user);
   const logout = useAuth((state) => state.logout);
+  const [closingBloodId, setClosingBloodId] = useState<string | null>(null);
 
   const bloodQuery = useQuery({
     queryKey: ["facility-bloods"],
@@ -133,6 +138,46 @@ export default function FacilityDashboard() {
     });
   }
 
+  function onClose(blood: FacilityBlood) {
+    Alert.alert(
+      "Tutup kebutuhan?",
+      "Kebutuhan yang ditutup akan hilang dari halaman donor, tetapi riwayat donasi tetap tersimpan.",
+      [
+        { text: "Batal", style: "cancel" },
+        {
+          text: "Tutup kebutuhan",
+          style: "destructive",
+          onPress: async () => {
+            setClosingBloodId(blood.id);
+
+            try {
+              await closeBlood(blood.id);
+
+              await Promise.all([
+                queryClient.invalidateQueries({
+                  queryKey: ["facility-bloods"],
+                }),
+                queryClient.invalidateQueries({
+                  queryKey: ["nearby-hospitals"],
+                }),
+                queryClient.invalidateQueries({
+                  queryKey: ["matching-bloods"],
+                }),
+              ]);
+            } catch (error: any) {
+              Alert.alert(
+                "Gagal menutup kebutuhan",
+                errorMessage(error, "Coba lagi atau periksa koneksi."),
+              );
+            } finally {
+              setClosingBloodId(null);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <View className="flex-1 bg-ground">
       <StatusBar style="dark" />
@@ -163,21 +208,11 @@ export default function FacilityDashboard() {
                     "Fasilitas kesehatan"}
                 </Text>
 
-                <View className="flex-row items-center mt-1">
-                  <View className="self-start px-2 py-0.5 rounded-pill bg-primary-soft">
-                    <Text className="font-archivo-bold text-overline tracking-overline text-primary-dark">
-                      {hospitalQuery.data?.isVerified === false
-                        ? "BELUM TERVERIFIKASI"
-                        : "TERVERIFIKASI"}
-                    </Text>
-                  </View>
-
-                  {hospitalQuery.data?.code ? (
-                    <Text className="ml-2 font-archivo-semibold text-caption text-ink-muted">
-                      {hospitalQuery.data.code}
-                    </Text>
-                  ) : null}
-                </View>
+                {hospitalQuery.data?.code ? (
+                  <Text className="mt-1 font-archivo-semibold text-caption text-ink-muted">
+                    {hospitalQuery.data.code}
+                  </Text>
+                ) : null}
               </View>
             </View>
 
@@ -267,6 +302,8 @@ export default function FacilityDashboard() {
                       key={blood.id}
                       blood={blood}
                       onPress={() => onManage(blood.id)}
+                      onClose={() => onClose(blood)}
+                      closing={closingBloodId === blood.id}
                     />
                   ))}
                 </View>
@@ -282,9 +319,13 @@ export default function FacilityDashboard() {
 function BloodCard({
   blood,
   onPress,
+  onClose,
+  closing,
 }: {
   blood: FacilityBlood;
   onPress: () => void;
+  onClose: () => void;
+  closing: boolean;
 }) {
   const applicants = blood.applicants_count ?? 0;
   const collected = blood.collected ?? 0;
@@ -297,6 +338,7 @@ function BloodCard({
   const component = blood.component
     ? (COMPONENT_LABELS[blood.component] ?? blood.component)
     : null;
+  const quotaFulfilled = blood.quantity > 0 && collected >= blood.quantity;
 
   return (
     <Pressable
@@ -362,6 +404,25 @@ function BloodCard({
           Kelola →
         </Text>
       </View>
+
+      {quotaFulfilled ? (
+        <Pressable
+          onPress={(event) => {
+            event.stopPropagation();
+            onClose();
+          }}
+          disabled={closing}
+          className="items-center py-3 mt-4 border rounded-pill border-primary bg-primary-soft"
+        >
+          {closing ? (
+            <ActivityIndicator color="#A31B0A" />
+          ) : (
+            <Text className="font-archivo-bold text-caption text-primary-dark">
+              Tutup kebutuhan
+            </Text>
+          )}
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }

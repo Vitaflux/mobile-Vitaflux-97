@@ -1,23 +1,27 @@
 import { useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
+import { Image } from "expo-image";
 
 // Isi 3 langkah — persis dari markup design (.dc.html).
 const STEPS = [
   {
-    img: "peta & kantong darah",
+    image: require("../../assets/images/onboarding-nearby-donor.png"),
+    imageLabel: "Peta yang menghubungkan pendonor dengan rumah sakit terdekat",
     title: "Kebutuhan darah, di dekatmu",
     body: "Vitaflux mencocokkan golongan darahmu dengan permintaan dari rumah sakit dan PMI dalam radius yang kamu tentukan.",
   },
   {
-    img: "formulir skrining",
+    image: require("../../assets/images/onboarding-screening.png"),
+    imageLabel: "Formulir skrining kesehatan donor",
     title: "Skrining dulu, baru daftar",
     body: "Kuesioner singkat memastikan kamu memang siap donor — supaya tidak datang jauh-jauh lalu ditolak.",
   },
   {
-    img: "kartu donor",
+    image: require("../../assets/images/onboarding-donor-card.png"),
+    imageLabel: "Kartu donor digital dan pencapaian donor",
     title: "Riwayat yang bisa dibanggakan",
     body: "Setiap donasi tercatat di Kartu Donor Digital-mu, lengkap dengan pengingat kapan boleh donor lagi.",
   },
@@ -44,14 +48,21 @@ export default function Onboarding() {
           </Pressable>
         </View>
 
-        {/* Ilustrasi (placeholder) */}
-        <View className="mt-2 h-64 items-center justify-center rounded-[18px] bg-primary-soft">
-          <Text className="font-archivo-bold text-overline tracking-overline text-primary-dark">
-            ILUSTRASI
-          </Text>
-          <Text className="mt-2 font-archivo text-caption text-ink-muted">
-            placeholder {step.img}
-          </Text>
+        {/* Ilustrasi */}
+        <View className="mt-2 h-64 overflow-hidden rounded-[18px] bg-primary-soft">
+          {STEPS.map((item, index) => (
+            <Image
+              key={item.title}
+              source={item.image}
+              accessibilityLabel={index === i ? item.imageLabel : undefined}
+              accessible={index === i}
+              contentFit="contain"
+              style={[
+                StyleSheet.absoluteFillObject,
+                { opacity: index === i ? 1 : 0 },
+              ]}
+            />
+          ))}
         </View>
 
         {/* Judul + body */}
