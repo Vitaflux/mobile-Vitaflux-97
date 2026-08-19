@@ -60,11 +60,11 @@ const COMPONENTS: {
 }[] = [
   {
     value: "whole_blood",
-    label: "Whole blood",
+    label: "Darah utuh",
   },
   {
     value: "plasma",
-    label: "Plasma",
+    label: "Plasma darah",
   },
   {
     value: "trombosit",
@@ -72,7 +72,7 @@ const COMPONENTS: {
   },
   {
     value: "eritrosit",
-    label: "Eritrosit",
+    label: "Sel darah merah",
   },
 ];
 
@@ -123,7 +123,7 @@ export default function CreateBlood() {
   const valid = title.trim().length > 0 && qty >= 1 && scheduleValid;
 
   const selectedComponent =
-    COMPONENTS.find((item) => item.value === component)?.label ?? "Whole blood";
+    COMPONENTS.find((item) => item.value === component)?.label ?? "Darah utuh";
 
   function onPickerChange(event: DateTimePickerEvent, value?: Date) {
     const picker = activePicker;
