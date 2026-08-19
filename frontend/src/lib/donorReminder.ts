@@ -25,11 +25,32 @@ function parseScheduleDate(scheduleAt: string) {
   return date;
 }
 
-function getReminderDate(scheduleAt: string, timing: ReminderTiming): Date {
+function getReminderDate(
+  scheduleAt: string,
+  timing: ReminderTiming,
+  scheduleEndAt?: string | null,
+): Date {
   const date = parseScheduleDate(scheduleAt);
 
   if (timing === "h-3") {
     date.setDate(date.getDate() - 3);
+    return date;
+  }
+
+  const now = Date.now();
+
+  if (date.getTime() > now) {
+    return date;
+  }
+
+  if (scheduleEndAt) {
+    const endDate = parseScheduleDate(scheduleEndAt);
+
+    if (endDate.getTime() > now) {
+      // Expo membutuhkan trigger DATE di masa depan. Saat jadwal sedang
+      // berlangsung, kirim pengingat sesegera mungkin.
+      return new Date(now + 1000);
+    }
   }
 
   return date;
@@ -108,8 +129,9 @@ export async function cancelDonorReminder() {
 export async function scheduleDonorReminder(
   scheduleAt: string,
   timing: ReminderTiming,
+  scheduleEndAt?: string | null,
 ): Promise<DonorReminder> {
-  const reminderDate = getReminderDate(scheduleAt, timing);
+  let reminderDate = getReminderDate(scheduleAt, timing, scheduleEndAt);
 
   if (reminderDate.getTime() <= Date.now()) {
     throw new Error("Waktu pengingat sudah lewat.");
@@ -117,6 +139,14 @@ export async function scheduleDonorReminder(
 
   await prepareNotificationPermission();
   await cancelDonorReminder();
+
+  // Dialog izin dapat terbuka cukup lama. Hitung ulang agar trigger "segera"
+  // untuk jadwal yang sedang berlangsung tetap berada di masa depan.
+  reminderDate = getReminderDate(scheduleAt, timing, scheduleEndAt);
+
+  if (reminderDate.getTime() <= Date.now()) {
+    throw new Error("Waktu pengingat sudah lewat.");
+  }
 
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
