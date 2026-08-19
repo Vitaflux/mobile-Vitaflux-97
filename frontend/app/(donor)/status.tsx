@@ -130,6 +130,12 @@ export default function Status() {
 
   const current = IDX[req.status] ?? 0;
   const qrActive = req.status === "confirmed" && Boolean(req.qr_token);
+  const statusLabel =
+    req.status === "registered"
+      ? "TERDAFTAR"
+      : req.status === "confirmed"
+        ? "DIKONFIRMASI"
+        : "SELESAI";
 
   return (
     <View className="flex-1 bg-ground">
@@ -138,85 +144,111 @@ export default function Status() {
       <SafeAreaView className="flex-1">
         <ScrollView contentContainerClassName="px-6 pb-10">
           {/* Header */}
-          <View className="flex-row items-center h-12">
-            <Pressable
-              onPress={() => router.replace("/(donor)")}
-              hitSlop={8}
-              className="mr-3"
-            >
-              <Text className="text-2xl text-ink">←</Text>
-            </Pressable>
-
-            <Text className="font-archivo-semibold text-body text-ink">
-              Status pendaftaran
-            </Text>
-          </View>
+          <Text className="mt-3 font-archivo-black text-judul text-ink">
+            Status donor
+          </Text>
 
           {/* Konteks kebutuhan */}
-          {req.hospital?.hospital_name && (
-            <View className="mt-2 rounded-[18px] border border-line bg-surface p-4">
-              <Text className="font-archivo-bold text-body text-ink">
-                {req.hospital.hospital_name}
-              </Text>
+          <View className="p-5 mt-5 border rounded-[18px] border-line bg-surface">
+            <View className="flex-row items-start">
+              {req.blood ? (
+                <View className="items-center justify-center w-16 h-16 rounded-[18px] bg-primary">
+                  <Text className="leading-none text-white font-archivo-black text-judul">
+                    {req.blood.blood_type}
+                  </Text>
 
-              {req.blood && (
-                <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                  {req.blood.blood_type}
-                  {req.blood.rhesus} · {req.blood.quantity} kantong
+                  <Text className="mt-1 text-white font-archivo-bold text-caption">
+                    {req.blood.rhesus}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View className={req.blood ? "flex-1 ml-4" : "flex-1"}>
+                <View
+                  className={`self-start rounded-pill px-3 py-1 ${
+                    req.status === "confirmed"
+                      ? "bg-primary"
+                      : req.status === "done"
+                        ? "bg-ink"
+                        : "bg-ground"
+                  }`}
+                >
+                  <Text
+                    className={`font-archivo-bold text-overline tracking-overline ${
+                      req.status === "registered"
+                        ? "text-ink-muted"
+                        : "text-white"
+                    }`}
+                  >
+                    {statusLabel}
+                  </Text>
+                </View>
+
+                <Text className="mt-2 font-archivo-black text-subjudul text-ink">
+                  {req.hospital?.hospital_name ?? "Fasilitas kesehatan"}
                 </Text>
-              )}
+
+                {req.blood ? (
+                  <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                    {req.blood.title || "Kebutuhan darah"} · {req.blood.quantity}{" "}
+                    kantong
+                  </Text>
+                ) : null}
+              </View>
             </View>
-          )}
 
-          {/* Stepper */}
-          <View className="mt-6">
-            {STEPS.map((step, index) => {
-              const active = index <= current;
-              const isLast = index === STEPS.length - 1;
+            <View className="h-px my-5 bg-line" />
 
-              return (
-                <View key={step.key} className="flex-row">
-                  <View className="items-center mr-4">
-                    <View
-                      className={`h-8 w-8 items-center justify-center rounded-pill ${
-                        active ? "bg-primary" : "border border-line bg-surface"
-                      }`}
-                    >
-                      <Text
-                        className={`font-archivo-black text-caption ${
-                          active ? "text-white" : "text-ink-muted"
+            {/* Stepper */}
+            <View>
+              {STEPS.map((step, index) => {
+                const active = index <= current;
+                const isLast = index === STEPS.length - 1;
+
+                return (
+                  <View key={step.key} className="flex-row">
+                    <View className="items-center mr-4">
+                      <View
+                        className={`h-8 w-8 items-center justify-center rounded-pill ${
+                          active ? "bg-primary" : "border border-line bg-surface"
                         }`}
                       >
-                        {index + 1}
-                      </Text>
+                        <Text
+                          className={`font-archivo-black text-caption ${
+                            active ? "text-white" : "text-ink-muted"
+                          }`}
+                        >
+                          {index + 1}
+                        </Text>
+                      </View>
+
+                      {!isLast && (
+                        <View
+                          className={`w-0.5 flex-1 ${
+                            index < current ? "bg-primary" : "bg-line"
+                          }`}
+                          style={{ minHeight: 32 }}
+                        />
+                      )}
                     </View>
 
-                    {!isLast && (
-                      <View
-                        className={`w-0.5 flex-1 ${
-                          index < current ? "bg-primary" : "bg-line"
+                    <View className={`flex-1 ${isLast ? "" : "pb-5"}`}>
+                      <Text
+                        className={`font-archivo-bold text-body ${
+                          active ? "text-ink" : "text-ink-muted"
                         }`}
-                        style={{ minHeight: 36 }}
-                      />
-                    )}
-                  </View>
+                      >
+                        {step.label}
+                      </Text>
 
-                  <View className={`flex-1 ${isLast ? "" : "pb-6"}`}>
-                    <Text
-                      className={`font-archivo-bold text-body ${
-                        active ? "text-ink" : "text-ink-muted"
-                      }`}
-                    >
-                      {step.label}
-                    </Text>
-
-                    <Text className="mt-0.5 font-archivo text-caption text-ink-muted">
-                      {step.desc}
-                    </Text>
+                      <Text className="mt-0.5 font-archivo text-caption text-ink-muted">
+                        {step.desc}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
 
           {/* QR check-in */}
@@ -224,12 +256,12 @@ export default function Status() {
             QR CHECK-IN
           </Text>
 
-          <View className="items-center rounded-[18px] border border-line bg-surface p-6">
+          <View className="items-center p-5 border rounded-[18px] border-line bg-surface">
             {qrActive ? (
               <>
                 <QRCode
                   value={req.qr_token!}
-                  size={200}
+                  size={176}
                   color="#201E1D"
                   backgroundColor="#FFFFFF"
                 />
@@ -240,8 +272,8 @@ export default function Status() {
               </>
             ) : req.status === "registered" ? (
               <>
-                <View className="items-center justify-center w-28 h-28 rounded-[18px] bg-ground">
-                  <LockKeyhole color="#605D5D" size={42} />
+                <View className="items-center justify-center w-24 h-24 rounded-[18px] bg-ground">
+                  <LockKeyhole color="#605D5D" size={36} />
                 </View>
 
                 <Text className="mt-4 text-center font-archivo-bold text-body text-ink">
@@ -265,9 +297,13 @@ export default function Status() {
             )}
 
             {req.code ? (
-              <View className="px-4 py-2 mt-4 rounded-pill bg-ground">
-                <Text className="font-archivo-bold text-body text-ink">
-                  Kode kehadiran: {req.code}
+              <View className="items-center w-full pt-4 mt-5 border-t border-line">
+                <Text className="font-archivo-bold text-overline tracking-overline text-ink-muted">
+                  KODE KEHADIRAN
+                </Text>
+
+                <Text className="mt-1 font-archivo-black text-judul text-ink">
+                  {req.code}
                 </Text>
               </View>
             ) : null}

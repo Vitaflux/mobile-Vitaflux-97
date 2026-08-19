@@ -279,16 +279,16 @@ export default function DonorHome() {
                 Halo,
               </Text>
 
-              <Text className="font-archivo-bold text-subjudul text-ink">
+              <Text className="font-archivo-black text-judul text-ink">
                 {user?.name ?? "Pendonor"}
               </Text>
             </View>
 
             <Pressable
               onPress={() => router.push("/(donor)/profile")}
-              className="items-center justify-center w-11 h-11 rounded-card bg-primary"
+              className="items-center justify-center w-12 h-12 rounded-pill bg-primary-tint"
             >
-              <Text className="text-white font-archivo-black text-body">
+              <Text className="font-archivo-black text-body text-primary-dark">
                 {(user?.name?.[0] ?? "V").toUpperCase()}
               </Text>
             </Pressable>
@@ -328,22 +328,35 @@ export default function DonorHome() {
                     : "border-line bg-surface"
                 }`}
               >
-                <Text
-                  className={`font-archivo-black text-subjudul ${
-                    profile?.eligibility.is_eligible
-                      ? "text-primary-dark"
-                      : "text-ink"
-                  }`}
-                >
-                  {profile?.eligibility.is_eligible
-                    ? "Kamu boleh donor sekarang"
-                    : `Boleh donor lagi dalam ${profile?.eligibility.remaining_days} hari`}
-                </Text>
+                <View className="flex-row items-start">
+                  <View className="items-center justify-center w-12 h-12 mr-4 rounded-card bg-primary">
+                    <Text className="leading-none text-white font-archivo-black text-body">
+                      {profile?.blood_type}
+                    </Text>
 
-                <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                  Golongan {profile?.blood_type}
-                  {profile?.rhesus} · radius {radiusMeters / 1000} km
-                </Text>
+                    <Text className="mt-0.5 text-white font-archivo-bold text-overline">
+                      {profile?.rhesus}
+                    </Text>
+                  </View>
+
+                  <View className="flex-1">
+                    <Text
+                      className={`font-archivo-black text-body ${
+                        profile?.eligibility.is_eligible
+                          ? "text-primary-dark"
+                          : "text-ink"
+                      }`}
+                    >
+                      {profile?.eligibility.is_eligible
+                        ? "Kamu boleh donor sekarang"
+                        : `Boleh donor lagi dalam ${profile?.eligibility.remaining_days} hari`}
+                    </Text>
+
+                    <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                      Radius pencarian {radiusMeters / 1000} km
+                    </Text>
+                  </View>
+                </View>
 
                 {lastDonorText && daysAfterDonor !== null ? (
                   <Text className="mt-2 font-archivo-semibold text-caption text-ink">
@@ -356,7 +369,9 @@ export default function DonorHome() {
                 )}
               </View>
 
-              <DonorReminderCard />
+              <DonorReminderCard
+                eligibleAt={profile?.eligibility.eligible_at ?? null}
+              />
 
               {/* Heading */}
               <View className="flex-row items-baseline justify-between mt-7">
@@ -369,7 +384,7 @@ export default function DonorHome() {
                 </Text>
               </View>
 
-              {/* Radius */}
+              {/* Radius dan filter */}
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -398,14 +413,9 @@ export default function DonorHome() {
                     </Pressable>
                   );
                 })}
-              </ScrollView>
 
-              {/* Filters */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerClassName="gap-2 mt-3"
-              >
+                <View className="w-px mx-1 bg-line" />
+
                 {FILTERS.map((item) => {
                   const active = item.key === filter;
 
@@ -462,6 +472,7 @@ export default function DonorHome() {
                           router.push({
                             pathname: "/(donor)/detail",
                             params: {
+                              radius: String(radiusMeters),
                               data: JSON.stringify({
                                 ...blood,
                                 distanceKm: distance,
@@ -513,51 +524,72 @@ function MatchCard({
       onPress={onPress}
       className="rounded-[18px] border border-line bg-surface p-4 active:bg-ground"
     >
-      <View className="flex-row items-center justify-between">
+      <View className="flex-row items-start">
         <View
-          className={`rounded-pill px-3 py-1 ${
-            urgent ? "bg-primary" : "bg-ground"
+          className={`h-16 w-16 items-center justify-center rounded-[18px] border ${
+            urgent
+              ? "border-primary bg-primary"
+              : "border-primary-tint bg-primary-soft"
           }`}
         >
           <Text
-            className={`font-archivo-bold text-overline tracking-overline ${
-              urgent ? "text-white" : "text-ink-muted"
+            className={`leading-none font-archivo-black text-judul ${
+              urgent ? "text-white" : "text-primary-dark"
             }`}
           >
-            {urgent ? "MENDESAK" : "TERJADWAL"}
-          </Text>
-        </View>
-
-        <View className="px-3 py-1 rounded-pill bg-primary-soft">
-          <Text className="font-archivo-bold text-caption text-primary-dark">
             {blood.blood_type}
+          </Text>
+
+          <Text
+            className={`mt-1 font-archivo-bold text-caption ${
+              urgent ? "text-white" : "text-primary-dark"
+            }`}
+          >
             {blood.rhesus}
           </Text>
         </View>
+
+        <View className="flex-1 ml-4">
+          <View
+            className={`self-start rounded-pill px-3 py-1 ${
+              urgent ? "bg-primary-soft" : "bg-ground"
+            }`}
+          >
+            <Text
+              className={`font-archivo-bold text-overline tracking-overline ${
+                urgent ? "text-primary-dark" : "text-ink-muted"
+              }`}
+            >
+              {urgent ? "MENDESAK" : "TERJADWAL"}
+            </Text>
+          </View>
+
+          <Text className="mt-2 font-archivo-bold text-body text-ink">
+            {blood.title || "Kebutuhan darah"}
+          </Text>
+
+          <Text className="mt-1 font-archivo-semibold text-caption text-ink">
+            {blood.hospital?.hospital_name ?? "Fasilitas kesehatan"}
+          </Text>
+
+          {blood.hospital?.address ? (
+            <View className="flex-row items-start mt-1">
+              <MapPin color="#605D5D" size={15} />
+
+              <Text
+                className="flex-1 ml-1 font-archivo text-caption text-ink-muted"
+                numberOfLines={1}
+              >
+                {blood.hospital.address}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
-      <Text className="mt-3 font-archivo-bold text-body text-ink">
-        {blood.title || "Kebutuhan darah"}
-      </Text>
+      <View className="h-px my-3 bg-line" />
 
-      <Text className="mt-1 font-archivo-semibold text-caption text-ink">
-        {blood.hospital?.hospital_name ?? "Fasilitas kesehatan"}
-      </Text>
-
-      {blood.hospital?.address ? (
-        <View className="flex-row items-start mt-2">
-          <MapPin color="#605D5D" size={16} />
-
-          <Text
-            className="flex-1 ml-2 font-archivo text-caption text-ink-muted"
-            numberOfLines={2}
-          >
-            {blood.hospital.address}
-          </Text>
-        </View>
-      ) : null}
-
-      <Text className="mt-2 font-archivo text-caption text-ink-muted">
+      <Text className="font-archivo-semibold text-caption text-ink">
         {distance !== null ? `${distance.toFixed(1)} km · ` : ""}
         {formatSchedule(blood.schedule, blood.schedule_end)}
       </Text>
@@ -576,7 +608,7 @@ function MatchCard({
             {collected} dari {blood.quantity} kantong
           </Text>
 
-          <View className="h-2 mt-2 overflow-hidden rounded-pill bg-ground">
+          <View className="h-1.5 mt-2 overflow-hidden rounded-pill bg-ground">
             <View
               className="h-full rounded-pill bg-primary"
               style={{

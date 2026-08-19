@@ -3,8 +3,9 @@ import { View, Text, Pressable } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { Bell, ChevronRight } from "lucide-react-native";
 
-import { getDonorReminder } from "../lib/donorReminder";
+import { syncDonorReminderEligibility } from "../lib/donorReminder";
 import type { DonorReminder } from "../lib/donorReminder";
+import { useAuth } from "../store/auth";
 
 function formatReminderDate(value: string) {
   const date = new Date(value);
@@ -21,7 +22,12 @@ function formatReminderDate(value: string) {
   });
 }
 
-export default function DonorReminderCard() {
+export default function DonorReminderCard({
+  eligibleAt,
+}: {
+  eligibleAt: string | null;
+}) {
+  const userId = useAuth((state) => state.user?.id);
   const [reminder, setReminder] = useState<DonorReminder | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,8 +36,17 @@ export default function DonorReminderCard() {
       let active = true;
 
       async function loadReminder() {
+        if (!userId) {
+          setReminder(null);
+          setLoading(false);
+          return;
+        }
+
         try {
-          const storedReminder = await getDonorReminder();
+          const storedReminder = await syncDonorReminderEligibility(
+            userId,
+            eligibleAt,
+          );
 
           if (!active) return;
 
@@ -64,7 +79,7 @@ export default function DonorReminderCard() {
       return () => {
         active = false;
       };
-    }, []),
+    }, [eligibleAt, userId]),
   );
 
   if (loading) return null;

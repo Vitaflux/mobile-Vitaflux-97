@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@mongoloquent/nestjs';
 import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.model';
+import { Hospital } from '../hospitals/entities/hospital.model';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
 
@@ -15,6 +16,8 @@ export class AuthService {
   constructor(
     @InjectModel(User)
     private readonly userModel: User,
+    @InjectModel(Hospital)
+    private readonly hospitalModel: Hospital,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -38,6 +41,18 @@ export class AuthService {
       role: registerDto.role,
       created_at: createdAt,
     });
+
+    if (user.role === 'facility' && registerDto.location) {
+      await this.hospitalModel.insert({
+        user_id: user._id,
+        hospital_name: user.name,
+        location: {
+          type: registerDto.location.type,
+          coordinates: registerDto.location.coordinates,
+        },
+        isVerified: false,
+      });
+    }
 
     return {
       success: true,

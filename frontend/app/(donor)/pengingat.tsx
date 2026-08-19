@@ -15,11 +15,12 @@ import { Bell, CalendarDays, Check, Clock3, Trash2 } from "lucide-react-native";
 
 import { getMyProfile } from "../../src/api/profiles";
 import { errorMessage } from "../../src/lib/errorMessage";
+import { useAuth } from "../../src/store/auth";
 import {
   addEligibilityToCalendar,
   cancelDonorReminder,
-  getDonorReminder,
   scheduleDonorReminder,
+  syncDonorReminderEligibility,
 } from "../../src/lib/donorReminder";
 import type {
   DonorReminder,
@@ -76,6 +77,7 @@ function formatDateTime(value?: string | null) {
 }
 
 export default function DonorReminderScreen() {
+  const userId = useAuth((state) => state.user?.id);
   const [timing, setTiming] = useState<ReminderTiming>("h-3");
   const [reminder, setReminder] = useState<DonorReminder | null>(null);
   const [loadingReminder, setLoadingReminder] = useState(true);
@@ -91,22 +93,43 @@ export default function DonorReminderScreen() {
   const eligibleAt = profileQuery.data?.eligibility?.eligible_at ?? null;
 
   useEffect(() => {
+    if (!userId || !profileQuery.isSuccess) {
+      return;
+    }
+
+    const reminderUserId = userId;
+    let active = true;
+
     async function loadReminder() {
       try {
-        const storedReminder = await getDonorReminder();
-        setReminder(storedReminder);
+        const storedReminder = await syncDonorReminderEligibility(
+          reminderUserId,
+          eligibleAt,
+        );
+
+        if (active) {
+          setReminder(storedReminder);
+        }
       } catch {
-        setReminder(null);
+        if (active) {
+          setReminder(null);
+        }
       } finally {
-        setLoadingReminder(false);
+        if (active) {
+          setLoadingReminder(false);
+        }
       }
     }
 
     loadReminder();
-  }, []);
+
+    return () => {
+      active = false;
+    };
+  }, [eligibleAt, profileQuery.isSuccess, userId]);
 
   async function onSchedule() {
-    if (!eligibleAt) {
+    if (!userId || !eligibleAt) {
       Alert.alert(
         "Jadwal belum tersedia",
         "Lengkapi tanggal donor terakhir pada halaman profil.",
@@ -117,7 +140,7 @@ export default function DonorReminderScreen() {
     setScheduling(true);
 
     try {
-      const result = await scheduleDonorReminder(eligibleAt, timing);
+      const result = await scheduleDonorReminder(userId, eligibleAt, timing);
 
       setReminder(result);
 
@@ -171,10 +194,14 @@ export default function DonorReminderScreen() {
           text: "Hapus",
           style: "destructive",
           onPress: async () => {
+            if (!userId) {
+              return;
+            }
+
             setRemoving(true);
 
             try {
-              await cancelDonorReminder();
+              await cancelDonorReminder(userId);
               setReminder(null);
               Alert.alert("Dihapus", "Pengingat donor telah dibatalkan.");
             } catch (error: any) {
@@ -212,14 +239,31 @@ export default function DonorReminderScreen() {
             </Text>
           </View>
 
-          <Text className="mt-3 font-archivo-bold text-judul text-ink">
-            Jangan lewatkan jadwal donor berikutnya
-          </Text>
+          {reminder && !loadingReminder ? (
+            <View className="mt-4">
+              <View className="items-center justify-center w-16 h-16 rounded-sheet bg-primary">
+                <Bell color="#FFFFFF" size={30} />
+              </View>
 
-          <Text className="mt-2 leading-6 font-archivo text-body text-ink-muted">
-            Aktifkan notifikasi lokal atau tambahkan jadwal kelayakan donor ke
-            kalender HP.
-          </Text>
+              <Text className="mt-5 font-archivo-black text-display text-ink">
+                Pengingat aktif
+              </Text>
+
+              <Text className="mt-2 leading-6 font-archivo text-body text-ink-muted">
+                Kamu akan diingatkan sebelum jadwal donor berikutnya.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text className="mt-3 font-archivo-black text-judul text-ink">
+                Atur Pengingat Donor Berikutnya
+              </Text>
+
+              <Text className="mt-2 leading-6 font-archivo text-body text-ink-muted">
+                Pilih kapan aplikasi mengingatkan jadwal kelayakan donormu.
+              </Text>
+            </>
+          )}
 
           {/* Jadwal kelayakan */}
           {profileQuery.isLoading ? (
@@ -251,68 +295,60 @@ export default function DonorReminderScreen() {
             </View>
           ) : (
             <>
-              <Text className="mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
-                BOLEH DONOR LAGI
-              </Text>
-
-              <View className="p-5 mt-3 border rounded-card border-primary bg-primary-soft">
+              <View className="p-5 mt-6 border rounded-sheet border-line bg-surface">
                 <View className="flex-row items-center">
-                  <View className="items-center justify-center w-12 h-12 mr-4 rounded-card bg-primary">
-                    <CalendarDays color="#FFFFFF" size={24} />
+                  <View className="items-center justify-center w-12 h-12 mr-4 rounded-card bg-primary-soft">
+                    <CalendarDays color="#A31B0A" size={24} />
                   </View>
 
                   <View className="flex-1">
-                    <Text className="font-archivo-bold text-body text-primary-dark">
-                      {formatDate(eligibleAt)}
+                    <Text className="font-archivo-bold text-overline tracking-overline text-ink-muted">
+                      BOLEH DONOR LAGI
                     </Text>
 
-                    <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                      Berdasarkan tanggal donor terakhir dan interval kelayakan.
+                    <Text className="mt-1 font-archivo-black text-body text-ink">
+                      {formatDate(eligibleAt)}
                     </Text>
                   </View>
                 </View>
-              </View>
 
-              {!eligibleAt ? (
-                <View className="p-4 mt-3 border rounded-card border-line bg-surface">
-                  <Text className="font-archivo text-caption text-ink-muted">
-                    Tanggal kelayakan belum tersedia. Isi tanggal donor terakhir
-                    terlebih dahulu di halaman Profil.
-                  </Text>
-
-                  <Pressable
-                    onPress={() => router.push("/(donor)/profile")}
-                    className="items-center py-3 mt-4 border rounded-pill border-line"
-                  >
-                    <Text className="font-archivo-semibold text-body text-ink">
-                      Buka Profil
+                {!eligibleAt ? (
+                  <View className="p-4 mt-4 border rounded-card border-line bg-ground">
+                    <Text className="font-archivo text-caption text-ink-muted">
+                      Tanggal kelayakan belum tersedia. Isi tanggal donor
+                      terakhir terlebih dahulu di halaman Profil.
                     </Text>
-                  </Pressable>
-                </View>
-              ) : null}
 
-              {/* Pengingat aktif */}
-              <Text className="mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
-                PENGINGAT AKTIF
-              </Text>
+                    <Pressable
+                      onPress={() => router.push("/(donor)/profile")}
+                      className="items-center py-3 mt-4 border rounded-pill border-line bg-surface"
+                    >
+                      <Text className="font-archivo-semibold text-body text-ink">
+                        Buka Profil
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
 
-              {loadingReminder ? (
-                <View className="items-center py-8">
-                  <ActivityIndicator color="#EC3013" />
-                </View>
-              ) : reminder ? (
-                <View className="p-5 mt-3 border rounded-card border-primary bg-surface">
+                <View className="h-px my-5 bg-line" />
+
+                {/* Pengingat aktif */}
+                {loadingReminder ? (
+                  <View className="items-center py-5">
+                    <ActivityIndicator color="#EC3013" />
+                  </View>
+                ) : reminder ? (
                   <View className="flex-row items-start">
-                    <View className="items-center justify-center w-10 h-10 mr-3 rounded-pill bg-primary">
-                      <Bell color="#FFFFFF" size={20} />
+                    <View className="items-center justify-center w-10 h-10 mr-3 rounded-card bg-primary-soft">
+                      <Check color="#A31B0A" size={21} />
                     </View>
 
                     <View className="flex-1">
-                      <Text className="font-archivo-bold text-body text-ink">
-                        Notifikasi sudah dijadwalkan
+                      <Text className="font-archivo-bold text-overline tracking-overline text-ink-muted">
+                        NOTIFIKASI APLIKASI
                       </Text>
 
-                      <Text className="mt-1 leading-5 font-archivo text-caption text-ink-muted">
+                      <Text className="mt-1 font-archivo-bold text-body text-ink">
                         {formatDateTime(reminder.scheduledFor)}
                       </Text>
 
@@ -323,121 +359,117 @@ export default function DonorReminderScreen() {
                       </Text>
                     </View>
                   </View>
+                ) : (
+                  <View>
+                    <Text className="font-archivo-bold text-overline tracking-overline text-ink-muted">
+                      NOTIFIKASI APLIKASI
+                    </Text>
 
-                  <Pressable
-                    onPress={onCancelReminder}
-                    disabled={removing}
-                    className="flex-row items-center justify-center py-3 mt-4 border rounded-pill border-line"
-                  >
-                    {removing ? (
-                      <ActivityIndicator color="#A31B0A" />
-                    ) : (
-                      <>
-                        <Trash2 color="#A31B0A" size={18} />
+                    <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                      Belum ada pengingat aktif.
+                    </Text>
+                  </View>
+                )}
 
-                        <Text className="ml-2 font-archivo-semibold text-body text-primary-dark">
-                          Hapus pengingat
-                        </Text>
-                      </>
-                    )}
-                  </Pressable>
-                </View>
-              ) : (
-                <View className="p-5 mt-3 border rounded-card border-line bg-surface">
-                  <Text className="font-archivo-bold text-body text-ink">
-                    Belum ada pengingat
-                  </Text>
+                {/* Pilihan waktu */}
+                <Text className="mt-6 font-archivo-bold text-overline tracking-overline text-ink-muted">
+                  KAPAN DIINGATKAN
+                </Text>
 
-                  <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                    Pilih waktu notifikasi di bawah untuk mengaktifkannya.
-                  </Text>
-                </View>
-              )}
+                <View className="flex-row gap-2 mt-3">
+                  {OPTIONS.map((option) => {
+                    const active = timing === option.value;
 
-              {/* Pilihan waktu */}
-              <Text className="mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
-                WAKTU NOTIFIKASI
-              </Text>
-
-              <View className="gap-3 mt-3">
-                {OPTIONS.map((option) => {
-                  const active = timing === option.value;
-
-                  return (
-                    <Pressable
-                      key={option.value}
-                      onPress={() => setTiming(option.value)}
-                      className={`flex-row items-start rounded-card border p-4 ${
-                        active
-                          ? "border-primary bg-primary-soft"
-                          : "border-line bg-surface"
-                      }`}
-                    >
-                      <View
-                        className={`mr-3 mt-0.5 h-6 w-6 items-center justify-center rounded-pill border ${
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setTiming(option.value)}
+                        className={`flex-1 items-center rounded-card border px-3 py-3 ${
                           active
                             ? "border-primary bg-primary"
                             : "border-line bg-surface"
                         }`}
                       >
-                        {active ? <Check color="#FFFFFF" size={15} /> : null}
-                      </View>
-
-                      <View className="flex-1">
-                        <Text className="font-archivo-bold text-body text-ink">
+                        <Text
+                          className={`text-center font-archivo-bold text-caption ${
+                            active ? "text-white" : "text-ink"
+                          }`}
+                        >
                           {option.title}
                         </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
 
-                        <Text className="mt-1 leading-5 font-archivo text-caption text-ink-muted">
-                          {option.description}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
+                <Text className="mt-2 font-archivo text-caption text-ink-muted">
+                  {OPTIONS.find((option) => option.value === timing)?.description}
+                </Text>
+
+                {/* Aktifkan */}
+                <Pressable
+                  onPress={onSchedule}
+                  disabled={scheduling || !eligibleAt}
+                  className={`flex-row items-center justify-center py-4 mt-6 rounded-pill ${
+                    scheduling || !eligibleAt
+                      ? "bg-primary/60"
+                      : "bg-primary active:bg-primary-dark"
+                  }`}
+                >
+                  {scheduling ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Bell color="#FFFFFF" size={20} />
+
+                      <Text className="ml-2 text-white font-archivo-bold text-body">
+                        {reminder
+                          ? "Perbarui pengingat"
+                          : "Aktifkan pengingat"}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+
+                {/* Kalender */}
+                <Pressable
+                  onPress={onAddCalendar}
+                  disabled={addingCalendar || !eligibleAt}
+                  className="flex-row items-center justify-center py-4 mt-3 border rounded-pill border-line bg-surface"
+                >
+                  {addingCalendar ? (
+                    <ActivityIndicator color="#EC3013" />
+                  ) : (
+                    <>
+                      <Clock3 color="#201E1D" size={20} />
+
+                      <Text className="ml-2 font-archivo-bold text-body text-ink">
+                        Tambahkan ke kalender HP
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
               </View>
 
-              {/* Aktifkan */}
-              <Pressable
-                onPress={onSchedule}
-                disabled={scheduling || !eligibleAt}
-                className={`flex-row items-center justify-center py-4 mt-6 rounded-pill ${
-                  scheduling || !eligibleAt
-                    ? "bg-primary/60"
-                    : "bg-primary active:bg-primary-dark"
-                }`}
-              >
-                {scheduling ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Bell color="#FFFFFF" size={20} />
+              {reminder && !loadingReminder ? (
+                <Pressable
+                  onPress={onCancelReminder}
+                  disabled={removing}
+                  className="flex-row items-center justify-center py-3 mt-3"
+                >
+                  {removing ? (
+                    <ActivityIndicator color="#A31B0A" />
+                  ) : (
+                    <>
+                      <Trash2 color="#A31B0A" size={18} />
 
-                    <Text className="ml-2 text-white font-archivo-bold text-body">
-                      {reminder ? "Perbarui pengingat" : "Aktifkan pengingat"}
-                    </Text>
-                  </>
-                )}
-              </Pressable>
-
-              {/* Kalender */}
-              <Pressable
-                onPress={onAddCalendar}
-                disabled={addingCalendar || !eligibleAt}
-                className="flex-row items-center justify-center py-4 mt-3 border rounded-pill border-line bg-surface"
-              >
-                {addingCalendar ? (
-                  <ActivityIndicator color="#EC3013" />
-                ) : (
-                  <>
-                    <Clock3 color="#201E1D" size={20} />
-
-                    <Text className="ml-2 font-archivo-bold text-body text-ink">
-                      Tambahkan ke kalender HP
-                    </Text>
-                  </>
-                )}
-              </Pressable>
+                      <Text className="ml-2 font-archivo-semibold text-caption text-primary-dark">
+                        Hapus pengingat
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              ) : null}
             </>
           )}
         </ScrollView>

@@ -163,8 +163,16 @@ export default function CreateBlood() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <View className="justify-center h-12">
-            <Text className="font-archivo-bold text-subjudul text-ink">
+          <View className="flex-row items-center h-12">
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={8}
+              className="items-center justify-center w-10 h-10 mr-2 rounded-pill active:bg-ground"
+            >
+              <Text className="text-2xl text-ink">←</Text>
+            </Pressable>
+
+            <Text className="font-archivo-bold text-body text-ink">
               Buat kebutuhan
             </Text>
           </View>
@@ -307,6 +315,10 @@ export default function CreateBlood() {
                 <ActivityIndicator color="#EC3013" />
               ) : (
                 <>
+                  <Text className="font-archivo-bold text-overline tracking-overline text-ink-muted">
+                    LOKASI FASKES · READ-ONLY
+                  </Text>
+
                   <Text className="font-archivo-semibold text-body text-ink">
                     {hospitalQuery.data?.hospital_name ?? "Fasilitas kesehatan"}
                   </Text>
@@ -400,7 +412,7 @@ export default function CreateBlood() {
         </ScrollView>
 
         {/* CTA */}
-        <View className="px-6 pt-3 pb-2 border-t border-line bg-ground">
+        <View className="px-6 pt-3 pb-2 border-t border-line bg-surface">
           <Pressable
             onPress={onSubmit}
             disabled={saving || !valid}
@@ -429,7 +441,7 @@ const inputCls =
 
 function Label({ children }: { children: ReactNode }) {
   return (
-    <Text className="mt-5 mb-2 font-archivo-medium text-caption text-ink">
+    <Text className="mt-4 mb-2 font-archivo-medium text-caption text-ink">
       {children}
     </Text>
   );
@@ -439,7 +451,7 @@ function Stepper({ onPress, label }: { onPress: () => void; label: string }) {
   return (
     <Pressable
       onPress={onPress}
-      className="items-center justify-center w-12 h-12 border rounded-card border-line bg-surface active:bg-ground"
+      className="items-center justify-center w-12 h-12 border rounded-pill border-line bg-surface active:bg-ground"
     >
       <Text className="font-archivo-black text-judul text-ink">{label}</Text>
     </Pressable>
@@ -464,7 +476,7 @@ function Seg({
           <Pressable
             key={option}
             onPress={() => onChange(option)}
-            className={`flex-1 items-center rounded-card border py-3 ${
+            className={`h-14 flex-1 items-center justify-center rounded-card border ${
               active ? "border-primary bg-primary" : "border-line bg-surface"
             }`}
           >

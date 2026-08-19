@@ -375,8 +375,47 @@ export class BloodsService implements OnModuleInit {
       ),
     );
 
-    const matches = Array.from(matchingBloods)
-      .filter((blood) => blood.status_blood !== 'closed')
+    const matchingBloodList = Array.from(matchingBloods).filter(
+      (blood) => blood.status_blood !== 'closed',
+    );
+    const matchingBloodIds = matchingBloodList.map((blood) => blood._id);
+    const requests =
+      matchingBloodIds.length === 0
+        ? []
+        : Array.from(
+            await this.requestModel
+              .whereIn('bloods_id', matchingBloodIds)
+              .get(),
+          );
+    const requestCountsByBloodId = new Map<
+      string,
+      {
+        applicantsCount: number;
+        collected: number;
+      }
+    >();
+
+    for (const request of requests) {
+      const bloodId = request.bloods_id.toString();
+      const currentCounts = requestCountsByBloodId.get(bloodId) ?? {
+        applicantsCount: 0,
+        collected: 0,
+      };
+
+      currentCounts.applicantsCount += 1;
+
+      if (request.status === 'confirmed') {
+        currentCounts.collected += 1;
+      }
+
+      if (request.status === 'done') {
+        currentCounts.collected += 1;
+      }
+
+      requestCountsByBloodId.set(bloodId, currentCounts);
+    }
+
+    const matches = matchingBloodList
       .sort((firstBlood, secondBlood) => {
         const firstOrder =
           hospitalsById.get(firstBlood.hospitals_id.toString())?.order ??
@@ -389,6 +428,10 @@ export class BloodsService implements OnModuleInit {
         return firstOrder - secondOrder;
       })
       .map((blood) => {
+        const counts = requestCountsByBloodId.get(blood._id.toString()) ?? {
+          applicantsCount: 0,
+          collected: 0,
+        };
         const hospitalData = hospitalsById.get(
           blood.hospitals_id.toString(),
         )?.hospital;
@@ -405,6 +448,8 @@ export class BloodsService implements OnModuleInit {
           note: blood.note ?? null,
           component: blood.component ?? null,
           schedule_end: blood.schedule_end ?? null,
+          applicants_count: counts.applicantsCount,
+          collected: counts.collected,
           created_at: blood.created_at,
           hospital: hospitalData
             ? {

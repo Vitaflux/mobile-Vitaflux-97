@@ -1,11 +1,13 @@
+import { useCallback } from "react";
 import { View, Text, Pressable, ScrollView, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { MapPin, Navigation } from "lucide-react-native";
 import MapView, { Marker } from "react-native-maps";
 import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "../../src/api/profiles";
+import { matchBloods } from "../../src/api/bloods";
 
 type Detail = {
   id: string;
@@ -150,9 +152,46 @@ function estimateTravelTime(distanceKm?: number | null) {
 export default function BloodDetail() {
   const params = useLocalSearchParams<{
     data?: string;
+    radius?: string;
   }>();
 
-  const detail = parseDetail(params.data);
+  const initialDetail = parseDetail(params.data);
+
+  const parsedRadius = Number(params.radius);
+
+  const radiusMeters =
+    Number.isFinite(parsedRadius) && parsedRadius >= 1 && parsedRadius <= 20000
+      ? parsedRadius
+      : 10000;
+
+  const matchesQuery = useQuery({
+    queryKey: ["matches", radiusMeters],
+    queryFn: () => matchBloods(radiusMeters),
+    enabled: false,
+  });
+
+  const refetchMatches = matchesQuery.refetch;
+  const detailId = initialDetail?.id;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!detailId) return;
+
+      void refetchMatches();
+    }, [detailId, refetchMatches]),
+  );
+
+  const refreshedDetail = matchesQuery.data?.find(
+    (blood) => blood.id === initialDetail?.id,
+  ) as Detail | undefined;
+
+  const detail = refreshedDetail
+    ? {
+        ...initialDetail,
+        ...refreshedDetail,
+        distanceKm: initialDetail?.distanceKm,
+      }
+    : initialDetail;
 
   const profileQuery = useQuery({
     queryKey: ["profile"],
@@ -249,7 +288,7 @@ export default function BloodDetail() {
   }
 
   return (
-    <View className="flex-1 bg-ground">
+    <View className="flex-1 bg-surface">
       <StatusBar style="dark" />
 
       <SafeAreaView className="flex-1">
@@ -269,42 +308,46 @@ export default function BloodDetail() {
             </Text>
           </View>
 
-          {/* Badge */}
-          <View className="flex-row items-center justify-between mt-2">
-            <View
-              className={`rounded-pill px-3 py-1 ${
-                urgent ? "bg-primary" : "border border-line bg-surface"
-              }`}
-            >
-              <Text
-                className={`font-archivo-bold text-overline tracking-overline ${
-                  urgent ? "text-white" : "text-ink-muted"
-                }`}
-              >
-                {urgent ? "MENDESAK" : "TERJADWAL"}
+          {/* Identity */}
+          <View className="flex-row items-start mt-2">
+            <View className="items-center justify-center w-20 h-20 rounded-sheet bg-primary">
+              <Text className="leading-none text-white font-archivo-black text-display">
+                {detail.blood_type}
+              </Text>
+
+              <Text className="mt-1 text-white font-archivo-bold text-body">
+                {detail.rhesus}
               </Text>
             </View>
 
-            <View className="px-4 py-1.5 rounded-pill bg-primary-soft">
-              <Text className="font-archivo-black text-body text-primary-dark">
-                {detail.blood_type}
-                {detail.rhesus}
+            <View className="flex-1 ml-4">
+              <View
+                className={`self-start rounded-pill px-3 py-1 ${
+                  urgent ? "bg-primary-soft" : "border border-line bg-surface"
+                }`}
+              >
+                <Text
+                  className={`font-archivo-bold text-overline tracking-overline ${
+                    urgent ? "text-primary-dark" : "text-ink-muted"
+                  }`}
+                >
+                  {urgent ? "MENDESAK" : "TERJADWAL"}
+                </Text>
+              </View>
+
+              <Text className="mt-2 leading-tight font-archivo-black text-subjudul text-ink">
+                {hospitalName}
+              </Text>
+
+              <Text className="mt-1 font-archivo-medium text-caption text-ink-muted">
+                {detail.title || "Kebutuhan darah"}
               </Text>
             </View>
           </View>
 
-          {/* Title */}
-          <Text className="mt-5 leading-tight font-archivo-bold text-judul text-ink">
-            {detail.title || "Kebutuhan darah"}
-          </Text>
-
-          <Text className="mt-2 font-archivo-bold text-body text-ink">
-            {detail.hospital?.hospital_name ?? "Fasilitas kesehatan"}
-          </Text>
-
           {detail.hospital?.address ? (
-            <View className="flex-row items-start mt-2">
-              <MapPin color="#605D5D" size={18} />
+            <View className="flex-row items-start mt-4">
+              <MapPin color="#605D5D" size={17} />
 
               <Text className="flex-1 ml-2 font-archivo text-caption text-ink-muted">
                 {detail.hospital.address}
@@ -312,56 +355,52 @@ export default function BloodDetail() {
             </View>
           ) : null}
 
-          {typeof displayedDistanceKm === "number" ? (
-            <View className="flex-row items-center mt-3">
-              <Navigation color="#A31B0A" size={17} />
-
-              <Text className="ml-2 font-archivo-semibold text-caption text-primary-dark">
-                {displayedDistanceKm.toFixed(1)} km dari lokasimu
-                {travelTime ? ` · ETA ${travelTime}` : ""}
-              </Text>
-            </View>
-          ) : null}
+          <View className="h-0.5 my-5 bg-ground" />
 
           {/* Information */}
-          <View className="mt-6 rounded-[18px] border border-line bg-surface">
-            <InfoRow
-              label="Jadwal"
-              value={formatSchedule(detail.schedule, detail.schedule_end)}
-            />
+          <View className="flex-row">
+            <View className="flex-1 pr-3">
+              <Metric
+                label="Jarak"
+                value={
+                  typeof displayedDistanceKm === "number"
+                    ? `${displayedDistanceKm.toFixed(1)} km${
+                        travelTime ? ` · perkiraan ${travelTime}` : ""
+                      }`
+                    : "Belum tersedia"
+                }
+              />
+            </View>
 
-            <InfoRow
-              label="Golongan"
-              value={`${detail.blood_type}${detail.rhesus}`}
-            />
+            <View className="flex-1 pl-3">
+              <Metric
+                label="Jadwal"
+                value={formatSchedule(detail.schedule, detail.schedule_end)}
+              />
+            </View>
+          </View>
 
-            <InfoRow label="Komponen" value={component} />
+          <View className="flex-row mt-5">
+            <View className="flex-1 pr-3">
+              <Metric label="Komponen" value={component} />
+            </View>
 
-            <InfoRow
-              label="Dibutuhkan"
-              value={`${detail.quantity} kantong`}
-              last
-            />
+            <View className="flex-1 pl-3">
+              <Metric
+                label={hasProgress ? "Terkumpul" : "Dibutuhkan"}
+                value={
+                  hasProgress
+                    ? `${collected} / ${detail.quantity} kantong`
+                    : `${detail.quantity} kantong`
+                }
+              />
+            </View>
           </View>
 
           {/* Progress */}
           {hasProgress ? (
-            <View className="mt-4 rounded-[18px] border border-line bg-surface p-5">
-              <View className="flex-row items-center justify-between">
-                <Text className="font-archivo-bold text-body text-ink">
-                  Terkumpul
-                </Text>
-
-                <Text className="font-archivo-bold text-body text-primary-dark">
-                  {collected}/{detail.quantity}
-                </Text>
-              </View>
-
-              <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                {detail.applicants_count} pendaftar
-              </Text>
-
-              <View className="h-2 mt-3 overflow-hidden rounded-pill bg-ground">
+            <View className="mt-4">
+              <View className="h-1.5 overflow-hidden rounded-pill bg-ground">
                 <View
                   className="h-full rounded-pill bg-primary"
                   style={{
@@ -369,6 +408,10 @@ export default function BloodDetail() {
                   }}
                 />
               </View>
+
+              <Text className="mt-2 font-archivo text-caption text-ink-muted">
+                {detail.applicants_count} pendaftar
+              </Text>
             </View>
           ) : null}
 
@@ -379,7 +422,7 @@ export default function BloodDetail() {
 
           {hasCoordinates ? (
             <>
-              <View className="h-48 overflow-hidden rounded-[18px] border border-line bg-surface">
+              <View className="h-36 overflow-hidden rounded-[18px] border border-line bg-surface">
                 <MapView
                   style={{
                     width: "100%",
@@ -431,11 +474,9 @@ export default function BloodDetail() {
                 CATATAN DARI FASKES
               </Text>
 
-              <View className="p-5 border rounded-[18px] border-primary bg-primary-soft">
-                <Text className="leading-6 font-archivo text-body text-ink">
-                  {detail.note}
-                </Text>
-              </View>
+              <Text className="leading-6 font-archivo text-body text-ink">
+                {detail.note}
+              </Text>
             </>
           ) : null}
 
@@ -460,7 +501,7 @@ export default function BloodDetail() {
         </ScrollView>
 
         {/* CTA */}
-        <View className="px-6 pt-3 pb-2 border-t border-line bg-ground">
+        <View className="px-6 pt-3 pb-2 border-t border-line bg-surface">
           <Pressable
             onPress={onRegister}
             className="items-center py-4 rounded-pill bg-primary active:bg-primary-dark"
@@ -475,20 +516,20 @@ export default function BloodDetail() {
   );
 }
 
-function InfoRow({
+function Metric({
   label,
   value,
-  last = false,
 }: {
   label: string;
   value: string;
-  last?: boolean;
 }) {
   return (
-    <View className={`px-4 py-4 ${last ? "" : "border-b border-line"}`}>
-      <Text className="font-archivo text-caption text-ink-muted">{label}</Text>
+    <View>
+      <Text className="font-archivo-bold text-overline tracking-overline text-ink-muted">
+        {label.toUpperCase()}
+      </Text>
 
-      <Text className="mt-1 font-archivo-semibold text-body text-ink">
+      <Text className="mt-1 font-archivo-bold text-subjudul text-ink">
         {value}
       </Text>
     </View>

@@ -101,7 +101,7 @@ export default function Scan() {
     setScreen("confirm");
   }
 
-  async function onConfirmCheckIn() {
+  async function onConfirmCheckIn(volumeMl: number) {
     if (!pendingInput || processing) {
       return;
     }
@@ -113,9 +113,11 @@ export default function Scan() {
         pendingInput.type === "qr"
           ? await checkInRequest({
               qr_token: pendingInput.value,
+              volume_ml: volumeMl,
             })
           : await checkInRequest({
               code: pendingInput.value,
+              volume_ml: volumeMl,
             });
 
       setResult(response as unknown as CheckInResult);
@@ -327,10 +329,14 @@ export default function Scan() {
 
         {/* Scanner frame */}
         <View className="items-center justify-center flex-1">
-          <View className="h-64 w-64 rounded-[22px] border-2 border-white" />
+          <ScannerFrame />
 
-          <Text className="px-10 mt-6 text-center text-white font-archivo text-caption">
-            Arahkan kamera ke QR pendonor.
+          <Text className="px-10 mt-6 text-center text-white font-archivo-bold text-body">
+            Arahkan kamera ke QR pendonor
+          </Text>
+
+          <Text className="px-10 mt-2 text-center text-white/70 font-archivo text-caption">
+            Jaga QR tetap di dalam bingkai dan beri jarak sekitar 20 cm.
           </Text>
         </View>
 
@@ -342,7 +348,7 @@ export default function Scan() {
               setTorchEnabled(false);
               setScannerLocked(false);
             }}
-            className="flex-row items-center justify-center py-4 border rounded-pill border-white/60 bg-black/40"
+            className="flex-row items-center justify-center py-4 rounded-pill bg-primary active:bg-primary-dark"
           >
             <Keyboard color="#FFFFFF" size={20} />
 
@@ -444,64 +450,116 @@ function ConfirmationScreen({
 }: {
   pendingInput: InputMethod | null;
   processing: boolean;
-  onConfirm: () => void;
+  onConfirm: (volumeMl: number) => void;
   onCancel: () => void;
 }) {
+  const [volumeInput, setVolumeInput] = useState("");
+  const volumeMl = Number(volumeInput);
+  const volumeValid =
+    volumeInput.length > 0 && Number.isInteger(volumeMl) && volumeMl > 0;
   const displayValue =
     pendingInput?.type === "code"
       ? pendingInput.value
       : "QR pendonor berhasil dibaca";
 
   return (
-    <View className="flex-1 bg-ground">
-      <StatusBar style="dark" />
+    <View className="flex-1 bg-ink">
+      <StatusBar style="light" />
 
-      <SafeAreaView className="items-center justify-center flex-1 px-6">
-        <View className="items-center justify-center w-20 h-20 rounded-pill bg-primary-soft">
-          <QrCode color="#A31B0A" size={38} />
+      <View className="items-center justify-center flex-1 opacity-60">
+        <ScannerFrame subdued />
+      </View>
+
+      <SafeAreaView
+        edges={["bottom"]}
+        className="px-6 pt-3 rounded-t-sheet bg-surface"
+      >
+        <View className="self-center w-12 h-1 rounded-pill bg-line" />
+
+        <View className="flex-row items-center mt-4">
+          <View className="items-center justify-center w-8 h-8 rounded-pill bg-ink">
+            <QrCode color="#FFFFFF" size={17} />
+          </View>
+
+          <Text className="ml-3 font-archivo-bold text-body text-ink">
+            QR terbaca
+          </Text>
+
+          <View className="px-3 py-1 ml-auto rounded-pill bg-ink">
+            <Text className="text-white font-archivo-bold text-overline tracking-overline">
+              DIKONFIRMASI
+            </Text>
+          </View>
         </View>
 
-        <Text className="mt-6 text-center font-archivo-bold text-judul text-ink">
-          QR terbaca
-        </Text>
-
-        <Text className="mt-2 text-center font-archivo text-body text-ink-muted">
-          {displayValue}
-        </Text>
-
-        <View className="w-full p-5 mt-6 border rounded-card border-line bg-surface">
-          <Text className="font-archivo-bold text-body text-ink">
+        <View className="w-full p-5 mt-4 border rounded-[18px] border-line bg-surface">
+          <Text className="font-archivo-bold text-subjudul text-ink">
             Konfirmasi check-in
           </Text>
 
           <Text className="mt-1 font-archivo text-caption text-ink-muted">
-            Setelah dikonfirmasi, status donor akan berubah menjadi Selesai.
+            {displayValue}
           </Text>
+
+          <Text className="mt-5 mb-2 font-archivo-medium text-caption text-ink">
+            Volume darah aktual
+          </Text>
+
+          <View className="flex-row items-center">
+            <TextInput
+              value={volumeInput}
+              onChangeText={(value) => setVolumeInput(value.replace(/\D/g, ""))}
+              placeholder="Masukkan volume"
+              placeholderTextColor="#9B9797"
+              keyboardType="numeric"
+              className="flex-1 px-4 py-[14px] border rounded-card border-line bg-ground font-archivo text-body text-ink"
+            />
+
+            <Text className="ml-3 font-archivo-semibold text-body text-ink-muted">
+              ml
+            </Text>
+          </View>
+
+          {volumeInput.length > 0 && !volumeValid ? (
+            <Text className="mt-2 font-archivo text-caption text-primary-dark">
+              Volume harus lebih dari 0 ml.
+            </Text>
+          ) : null}
         </View>
 
-        <Pressable
-          onPress={onConfirm}
-          disabled={processing}
-          className="items-center w-full py-4 mt-6 rounded-pill bg-primary active:bg-primary-dark"
-        >
-          {processing ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text className="text-white font-archivo-bold text-body">
-              Tandai selesai
-            </Text>
-          )}
-        </Pressable>
+        <Text className="mt-3 font-archivo text-caption text-ink-muted">
+          Konfirmasi hanya setelah donasi benar-benar selesai.
+        </Text>
 
-        <Pressable
-          onPress={onCancel}
-          disabled={processing}
-          className="items-center w-full py-4 mt-3 border rounded-pill border-line bg-surface"
-        >
-          <Text className="font-archivo-semibold text-body text-ink">
-            Batal
-          </Text>
-        </Pressable>
+        <View className="flex-row gap-3 pt-4 pb-2">
+          <Pressable
+            onPress={onCancel}
+            disabled={processing}
+            className="items-center px-6 py-4 border rounded-pill border-line bg-surface"
+          >
+            <Text className="font-archivo-semibold text-body text-ink">
+              Batal
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => onConfirm(volumeMl)}
+            disabled={processing || !volumeValid}
+            className={`flex-1 items-center py-4 rounded-pill ${
+              volumeValid && !processing
+                ? "bg-primary active:bg-primary-dark"
+                : "bg-primary/50"
+            }`}
+          >
+            {processing ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text className="text-white font-archivo-bold text-body">
+                Tandai selesai
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </SafeAreaView>
     </View>
   );
@@ -515,55 +573,67 @@ function SuccessScreen({
   onNext: () => void;
 }) {
   return (
-    <View className="flex-1 bg-ground">
+    <View className="flex-1 bg-surface">
       <StatusBar style="dark" />
 
-      <SafeAreaView className="items-center justify-center flex-1 px-6">
-        <View className="items-center justify-center w-24 h-24 rounded-pill bg-primary">
-          <CheckCircle2 color="#FFFFFF" size={52} />
+      <SafeAreaView className="flex-1">
+        <View className="flex-1 px-7 pt-7">
+          <View className="items-center justify-center w-20 h-20 rounded-sheet bg-primary">
+            <CheckCircle2 color="#FFFFFF" size={44} />
+          </View>
+
+          <Text className="mt-6 font-archivo-black text-display text-ink">
+            Check-in berhasil
+          </Text>
+
+          <Text className="mt-2 font-archivo text-body text-ink-muted">
+            Status donor kini Selesai. Donasi sudah masuk ke riwayat pendonor.
+          </Text>
+
+          <View className="w-full mt-6 overflow-hidden border rounded-[18px] border-line bg-surface">
+            <View className="px-5 py-4 border-b border-line">
+              <View className="self-start px-3 py-1 rounded-pill bg-ink">
+                <Text className="text-white font-archivo-bold text-overline tracking-overline">
+                  SELESAI
+                </Text>
+              </View>
+            </View>
+
+            <View className="p-5">
+              <InfoRow label="Kode" value={result?.code || "-"} />
+
+              <InfoRow
+                label="Waktu check-in"
+                value={
+                  result?.checked_in_at
+                    ? new Date(result.checked_in_at).toLocaleString("id-ID")
+                    : "-"
+                }
+                last
+              />
+            </View>
+          </View>
         </View>
 
-        <Text className="mt-6 text-center font-archivo-bold text-judul text-ink">
-          Check-in berhasil
-        </Text>
+        <View className="px-7 pt-3 pb-2 border-t border-line bg-surface">
+          <Pressable
+            onPress={onNext}
+            className="items-center w-full py-4 rounded-pill bg-primary active:bg-primary-dark"
+          >
+            <Text className="text-white font-archivo-bold text-body">
+              Scan berikutnya
+            </Text>
+          </Pressable>
 
-        <Text className="mt-2 text-center font-archivo text-body text-ink-muted">
-          Status donor sudah berubah menjadi Selesai.
-        </Text>
-
-        <View className="w-full p-5 mt-6 border rounded-card border-line bg-surface">
-          <InfoRow label="Status" value="Selesai" />
-
-          <InfoRow label="Kode" value={result?.code || "-"} />
-
-          <InfoRow
-            label="Waktu check-in"
-            value={
-              result?.checked_in_at
-                ? new Date(result.checked_in_at).toLocaleString("id-ID")
-                : "-"
-            }
-            last
-          />
+          <Pressable
+            onPress={() => router.replace("/(facility)")}
+            className="items-center w-full py-4 mt-3 border rounded-pill border-ink bg-surface"
+          >
+            <Text className="font-archivo-semibold text-body text-ink">
+              Kembali ke Dashboard
+            </Text>
+          </Pressable>
         </View>
-
-        <Pressable
-          onPress={onNext}
-          className="items-center w-full py-4 mt-6 rounded-pill bg-primary active:bg-primary-dark"
-        >
-          <Text className="text-white font-archivo-bold text-body">
-            Scan berikutnya
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.replace("/(facility)")}
-          className="items-center w-full py-4 mt-3 border rounded-pill border-line bg-surface"
-        >
-          <Text className="font-archivo-semibold text-body text-ink">
-            Kembali ke Dashboard
-          </Text>
-        </Pressable>
       </SafeAreaView>
     </View>
   );
@@ -581,42 +651,80 @@ function ErrorScreen({
   onManual: () => void;
 }) {
   return (
-    <View className="flex-1 bg-ground">
-      <StatusBar style="dark" />
+    <View className="flex-1 bg-ink">
+      <StatusBar style="light" />
 
-      <SafeAreaView className="items-center justify-center flex-1 px-6">
-        <View className="items-center justify-center w-24 h-24 rounded-pill bg-primary-soft">
-          <TriangleAlert color="#A31B0A" size={48} />
+      <View className="items-center justify-center flex-1 opacity-30">
+        <ScannerFrame subdued />
+      </View>
+
+      <SafeAreaView
+        edges={["bottom"]}
+        className="px-6 pt-3 rounded-t-sheet bg-surface"
+      >
+        <View className="self-center w-12 h-1 rounded-pill bg-line" />
+
+        <View className="flex-row items-center mt-4">
+          <View className="items-center justify-center w-10 h-10 rounded-pill bg-primary-soft">
+            <TriangleAlert color="#A31B0A" size={21} />
+          </View>
+
+          <Text className="flex-1 ml-3 font-archivo-black text-subjudul text-ink">
+            {title}
+          </Text>
         </View>
 
-        <Text className="mt-6 text-center font-archivo-bold text-judul text-ink">
-          {title}
-        </Text>
-
-        <Text className="mt-2 text-center font-archivo text-body text-ink-muted">
-          {message}
-        </Text>
-
-        <Pressable
-          onPress={onRetry}
-          className="items-center w-full py-4 mt-6 rounded-pill bg-primary active:bg-primary-dark"
-        >
-          <Text className="text-white font-archivo-bold text-body">
-            Scan lagi
+        <View className="p-4 mt-4 border rounded-card border-line bg-ground">
+          <Text className="font-archivo text-caption text-ink-muted">
+            {message}
           </Text>
-        </Pressable>
+        </View>
 
-        <Pressable
-          onPress={onManual}
-          className="flex-row items-center justify-center w-full py-4 mt-3 border rounded-pill border-line bg-surface"
-        >
-          <Keyboard color="#201E1D" size={20} />
+        <View className="flex-row gap-3 pt-4 pb-2">
+          <Pressable
+            onPress={onManual}
+            className="flex-row items-center justify-center px-5 py-4 border rounded-pill border-line bg-surface"
+          >
+            <Keyboard color="#201E1D" size={18} />
 
-          <Text className="ml-2 font-archivo-semibold text-body text-ink">
-            Gunakan kode manual
-          </Text>
-        </Pressable>
+            <Text className="ml-2 font-archivo-semibold text-body text-ink">
+              Kode
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={onRetry}
+            className="items-center flex-1 py-4 rounded-pill bg-primary active:bg-primary-dark"
+          >
+            <Text className="text-white font-archivo-bold text-body">
+              Scan ulang
+            </Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
+    </View>
+  );
+}
+
+function ScannerFrame({ subdued = false }: { subdued?: boolean }) {
+  const borderColor = subdued ? "border-line" : "border-primary";
+  const lineColor = subdued ? "bg-line" : "bg-primary";
+
+  return (
+    <View className="relative w-64 h-64">
+      <View
+        className={`absolute top-0 left-0 w-10 h-10 border-t-2 border-l-2 rounded-tl-sheet ${borderColor}`}
+      />
+      <View
+        className={`absolute top-0 right-0 w-10 h-10 border-t-2 border-r-2 rounded-tr-sheet ${borderColor}`}
+      />
+      <View
+        className={`absolute bottom-0 left-0 w-10 h-10 border-b-2 border-l-2 rounded-bl-sheet ${borderColor}`}
+      />
+      <View
+        className={`absolute bottom-0 right-0 w-10 h-10 border-b-2 border-r-2 rounded-br-sheet ${borderColor}`}
+      />
+      <View className={`absolute left-3 right-3 h-0.5 top-1/2 ${lineColor}`} />
     </View>
   );
 }

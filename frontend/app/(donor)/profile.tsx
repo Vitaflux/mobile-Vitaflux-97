@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   View,
@@ -14,14 +14,18 @@ import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import * as Location from "expo-location";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, LogOut, MapPin } from "lucide-react-native";
+import {
+  Bell,
+  CalendarDays,
+  LogOut,
+  MapPin,
+  Pencil,
+} from "lucide-react-native";
 import { useAuth } from "../../src/store/auth";
 import { getMyProfile, updateMyProfile } from "../../src/api/profiles";
 import { errorMessage } from "../../src/lib/errorMessage";
+import { registerPushTokenForCurrentDevice } from "../../src/lib/pushNotifications";
 import type { BloodType, Rhesus } from "../../src/types/models";
-import { Bell } from "lucide-react-native";
-
-const MIN_DAYS = 90;
 
 const GOLONGAN: BloodType[] = ["A", "B", "AB", "O"];
 
@@ -41,20 +45,6 @@ function dateInput(value?: string | null) {
   }
 
   return date.toISOString().slice(0, 10);
-}
-
-function daysSince(value: string): number | null {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
 }
 
 function validOptionalDate(value: string) {
@@ -92,8 +82,6 @@ export default function DonorProfile() {
 
   const [city, setCity] = useState("");
 
-  const [lastDonation, setLastDonation] = useState("");
-
   const [radiusKm, setRadiusKm] = useState(10);
 
   const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
@@ -101,6 +89,8 @@ export default function DonorProfile() {
   const [locating, setLocating] = useState(false);
 
   const [saving, setSaving] = useState(false);
+
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     const profile = profileQuery.data;
@@ -119,28 +109,12 @@ export default function DonorProfile() {
 
     setCity(profile.city ?? "");
 
-    setLastDonation(dateInput(profile.last_donor));
-
     setRadiusKm(profile.notify_radius_km ?? 10);
 
     setCoordinates(profile.location.coordinates);
   }, [profileQuery.data]);
 
-  const eligibility = useMemo(() => {
-    const elapsed = daysSince(lastDonation);
-
-    if (elapsed === null) {
-      return null;
-    }
-
-    const remaining = MIN_DAYS - elapsed;
-
-    return {
-      eligible: remaining <= 0,
-      remaining: Math.max(0, remaining),
-      elapsed,
-    };
-  }, [lastDonation]);
+  const eligibility = profileQuery.data?.eligibility ?? null;
 
   const totalDonations = profileQuery.data?.stats?.total_donations ?? 0;
 
@@ -190,12 +164,6 @@ export default function DonorProfile() {
       return;
     }
 
-    if (!validOptionalDate(lastDonation)) {
-      Alert.alert("Tanggal donor tidak valid", "Gunakan format YYYY-MM-DD.");
-
-      return;
-    }
-
     const parsedWeight = weight ? Number(weight) : null;
 
     if (
@@ -223,9 +191,12 @@ export default function DonorProfile() {
         birth_date: birthDate || null,
         weight_kg: parsedWeight,
         city: city.trim() || null,
-        last_donor: lastDonation || null,
         notify_radius_km: radiusKm,
       });
+
+      // Profil donor sekarang pasti tersedia, jadi beri registrasi push yang
+      // gagal saat login kesempatan deterministik untuk mencoba sekali lagi.
+      void registerPushTokenForCurrentDevice();
 
       await Promise.all([
         queryClient.invalidateQueries({
@@ -236,6 +207,8 @@ export default function DonorProfile() {
         }),
       ]);
 
+      setEditing(false);
+
       Alert.alert("Tersimpan", "Profil berhasil diperbarui.");
     } catch (error: any) {
       Alert.alert(
@@ -245,6 +218,22 @@ export default function DonorProfile() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function onCancelEdit() {
+    const profile = profileQuery.data;
+
+    if (profile) {
+      setGolongan(profile.blood_type);
+      setRhesus(profile.rhesus);
+      setBirthDate(dateInput(profile.birth_date));
+      setWeight(profile.weight_kg ? String(profile.weight_kg) : "");
+      setCity(profile.city ?? "");
+      setRadiusKm(profile.notify_radius_km ?? 10);
+      setCoordinates(profile.location.coordinates);
+    }
+
+    setEditing(false);
   }
 
   async function onLogout() {
@@ -275,36 +264,37 @@ export default function DonorProfile() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <View className="flex-row items-center h-12">
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={8}
-              className="mr-3"
-            >
-              <Text className="text-2xl text-ink">←</Text>
-            </Pressable>
-
-            <Text className="font-archivo-semibold text-body text-ink">
-              Profil pendonor
+          <View className="flex-row items-center justify-between pt-3">
+            <Text className="font-archivo-black text-judul text-ink">
+              Profil
             </Text>
+
+            {!editing ? (
+              <Pressable
+                onPress={() => setEditing(true)}
+                hitSlop={8}
+                className="items-center justify-center w-11 h-11 border rounded-pill border-line bg-surface"
+              >
+                <Pencil color="#201E1D" size={19} />
+              </Pressable>
+            ) : null}
           </View>
 
           {/* Identity */}
-          <View className="flex-row items-center mt-2">
-            <View className="items-center justify-center mr-4 h-14 w-14 rounded-card bg-primary">
-              <Text className="text-lg text-white font-archivo-black">
+          <View className="flex-row items-center mt-5">
+            <View className="items-center justify-center w-16 h-16 mr-4 rounded-pill bg-primary-tint">
+              <Text className="font-archivo-black text-subjudul text-primary-dark">
                 {(user?.name?.[0] ?? user?.email?.[0] ?? "V").toUpperCase()}
               </Text>
             </View>
 
             <View className="flex-1">
-              <Text className="font-archivo-bold text-subjudul text-ink">
+              <Text className="font-archivo-black text-judul text-ink">
                 {user?.name ?? user?.email ?? "Pendonor"}
               </Text>
 
               <Text className="mt-0.5 font-archivo text-caption text-ink-muted">
-                Golongan {golongan}
-                {rhesus}
+                {city || "Kota domisili belum diisi"}
               </Text>
 
               <Text className="mt-1 font-archivo text-caption text-ink-muted">
@@ -316,9 +306,20 @@ export default function DonorProfile() {
           </View>
 
           {/* Statistics */}
-          <View className="flex-row gap-3 mt-6">
+          <View className="flex-row gap-3 mt-5">
             <View className="flex-1 p-4 border rounded-card border-line bg-surface">
               <Text className="font-archivo-black text-judul text-primary">
+                {golongan}
+                {rhesus}
+              </Text>
+
+              <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                Golongan darah
+              </Text>
+            </View>
+
+            <View className="flex-1 p-4 border rounded-card border-line bg-surface">
+              <Text className="font-archivo-black text-judul text-ink">
                 {totalDonations}
               </Text>
 
@@ -326,56 +327,48 @@ export default function DonorProfile() {
                 Total donasi
               </Text>
             </View>
-
-            <View className="flex-1 p-4 border rounded-card border-line bg-surface">
-              <Text className="font-archivo-black text-judul text-ink">
-                {memberSince ?? "-"}
-              </Text>
-
-              <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                Sejak tahun
-              </Text>
-            </View>
           </View>
 
           {/* Eligibility */}
           <View
             className={`mt-4 rounded-[18px] border p-5 ${
-              eligibility?.eligible
+              eligibility?.is_eligible
                 ? "border-primary bg-primary-soft"
                 : "border-line bg-surface"
             }`}
           >
             {eligibility === null ? (
               <Text className="font-archivo text-body text-ink-muted">
-                Isi tanggal donor terakhir untuk melihat status kelayakan.
+                Status kelayakan belum tersedia dari profil donor.
               </Text>
-            ) : eligibility.eligible ? (
+            ) : eligibility.is_eligible ? (
               <>
                 <Text className="font-archivo-black text-subjudul text-primary-dark">
                   Boleh donor sekarang
                 </Text>
 
                 <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                  Interval minimum {MIN_DAYS} hari sudah terlampaui.
+                  Status kelayakan dikonfirmasi oleh sistem Vitaflux.
                 </Text>
               </>
             ) : (
               <>
                 <Text className="font-archivo-black text-subjudul text-ink">
-                  Boleh donor lagi dalam {eligibility.remaining} hari
+                  Boleh donor lagi dalam {eligibility.remaining_days} hari
                 </Text>
 
                 <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                  {eligibility.elapsed} dari {MIN_DAYS} hari berlalu.
+                  Perkiraan tanggal: {dateInput(eligibility.eligible_at)}
                 </Text>
               </>
             )}
           </View>
 
-          <Text className="mb-3 mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
-            DATA PENDONOR
-          </Text>
+          {editing ? (
+            <>
+              <Text className="mb-3 mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
+                EDIT DATA PENDONOR
+              </Text>
 
           {/* Blood */}
           <Label>Golongan darah</Label>
@@ -453,15 +446,13 @@ export default function DonorProfile() {
           <View className="flex-row items-center">
             <CalendarDays color="#605D5D" size={20} />
 
-            <TextInput
-              value={lastDonation}
-              onChangeText={setLastDonation}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#9B9797"
-              keyboardType="numbers-and-punctuation"
-              maxLength={10}
-              className={`${inputClass} flex-1 ml-3`}
-            />
+            <View className={`${inputClass} flex-1 ml-3`}>
+              <Text className="font-archivo text-body text-ink">
+                {profileQuery.data?.last_donor
+                  ? dateInput(profileQuery.data.last_donor)
+                  : "Belum ada donasi selesai"}
+              </Text>
+            </View>
           </View>
 
           {/* Radius */}
@@ -526,19 +517,76 @@ export default function DonorProfile() {
           ) : null}
 
           {/* Actions */}
-          <Pressable
-            onPress={onSave}
-            disabled={saving}
-            className="items-center py-4 mt-7 rounded-pill bg-primary active:bg-primary-dark"
-          >
-            {saving ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text className="text-white font-archivo-bold text-body">
-                Simpan profil
+              <View className="flex-row gap-3 mt-7">
+                <Pressable
+                  onPress={onCancelEdit}
+                  disabled={saving}
+                  className="items-center px-6 py-4 border rounded-pill border-line bg-surface"
+                >
+                  <Text className="font-archivo-semibold text-body text-ink">
+                    Batal
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={onSave}
+                  disabled={saving}
+                  className="items-center flex-1 py-4 rounded-pill bg-primary active:bg-primary-dark"
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-white font-archivo-bold text-body">
+                      Simpan profil
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text className="mb-3 mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
+                DATA PENDONOR
               </Text>
-            )}
-          </Pressable>
+
+              <View className="overflow-hidden border rounded-card border-line bg-surface">
+                <ProfileRow
+                  label="Tanggal lahir"
+                  value={birthDate || "Belum diisi"}
+                />
+
+                <ProfileRow
+                  label="Berat badan"
+                  value={weight ? `${weight} kg` : "Belum diisi"}
+                />
+
+                <ProfileRow
+                  label="Kota domisili"
+                  value={city || "Belum diisi"}
+                />
+
+                <ProfileRow
+                  label="Donor terakhir"
+                  value={
+                    profileQuery.data?.last_donor
+                      ? dateInput(profileQuery.data.last_donor)
+                      : "Belum ada donasi selesai"
+                  }
+                />
+
+                <ProfileRow
+                  label="Radius notifikasi"
+                  value={`${radiusKm} km`}
+                />
+
+                <ProfileRow
+                  label="Lokasi"
+                  value={coordinates ? "Lokasi tersimpan" : "Belum diisi"}
+                  last
+                />
+              </View>
+            </>
+          )}
 
           <Pressable
             onPress={() => router.push("/(donor)/pengingat")}
@@ -569,6 +617,30 @@ export default function DonorProfile() {
 
 const inputClass =
   "rounded-card border border-line bg-surface px-4 py-[14px] font-archivo text-body text-ink";
+
+function ProfileRow({
+  label,
+  value,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  last?: boolean;
+}) {
+  return (
+    <View
+      className={`flex-row items-center justify-between px-4 py-4 ${
+        last ? "" : "border-b border-line"
+      }`}
+    >
+      <Text className="font-archivo text-caption text-ink-muted">{label}</Text>
+
+      <Text className="ml-4 text-right font-archivo-semibold text-caption text-ink">
+        {value}
+      </Text>
+    </View>
+  );
+}
 
 function Label({ children }: { children: ReactNode }) {
   return (

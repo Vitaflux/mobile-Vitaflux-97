@@ -1,11 +1,12 @@
 import { api } from "./client";
-import type { Role, User } from "../types/models";
+import type { GeoPoint, Role, User } from "../types/models";
 
 export interface RegisterInput {
   name: string;
   email: string;
   password: string;
   role: Role;
+  location?: GeoPoint;
 }
 
 export interface LoginResult {

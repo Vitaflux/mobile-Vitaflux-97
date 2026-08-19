@@ -17,6 +17,7 @@ import {
   URGENT_PUSH_RADIUS_METERS,
 } from '../common/constants';
 import { calculateDonorEligibility } from '../common/helpers/donor-eligibility.helper';
+import { calculateDistanceKm } from '../common/helpers/geo-distance.helper';
 import type { GeoPoint } from '../common/interfaces/geo-point.interface';
 import { UserProfile } from '../profiles/entities/user-profile.model';
 
@@ -48,12 +49,12 @@ export class NotificationsService implements OnModuleInit {
     });
   }
 
-  async updatePushTokenForDonor(userId: string, pushToken: string) {
+  async updatePushTokenForDonor(userId: string, pushToken: string | null) {
     if (!ObjectId.isValid(userId)) {
       throw new UnauthorizedException('Invalid authenticated user');
     }
 
-    if (!Expo.isExpoPushToken(pushToken)) {
+    if (pushToken !== null && !Expo.isExpoPushToken(pushToken)) {
       throw new BadRequestException('Invalid Expo push token');
     }
 
@@ -102,10 +103,19 @@ export class NotificationsService implements OnModuleInit {
 
     const messages = nearbyProfiles.flatMap((profile): ExpoPushMessage[] => {
       const eligibility = calculateDonorEligibility(profile.last_donor ?? null);
-
       const pushToken = profile.push_token;
+      const effectiveRadiusKm =
+        profile.notify_radius_km ?? URGENT_PUSH_RADIUS_METERS / 1000;
+      const distanceKm = calculateDistanceKm(
+        notification.hospitalLocation,
+        profile.location,
+      );
 
-      if (!eligibility.isEligible || !Expo.isExpoPushToken(pushToken)) {
+      if (
+        !eligibility.isEligible ||
+        !Expo.isExpoPushToken(pushToken) ||
+        distanceKm > effectiveRadiusKm
+      ) {
         return [];
       }
 

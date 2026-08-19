@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
+import * as Location from "expo-location";
 import { useAuth } from "../../src/store/auth";
 import { errorMessage } from "../../src/lib/errorMessage";
 
@@ -44,7 +45,42 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register({ email: email.trim(), password, role, name: name.trim() });
+      let location:
+        | {
+            type: "Point";
+            coordinates: [number, number];
+          }
+        | undefined;
+
+      if (role === "facility") {
+        const permission = await Location.requestForegroundPermissionsAsync();
+
+        if (permission.status !== "granted") {
+          Alert.alert(
+            "Lokasi diperlukan",
+            "Izinkan akses lokasi agar fasilitas dapat ditemukan pendonor terdekat.",
+          );
+          return;
+        }
+
+        const position = await Location.getCurrentPositionAsync({});
+
+        location = {
+          type: "Point",
+          coordinates: [
+            position.coords.longitude,
+            position.coords.latitude,
+          ],
+        };
+      }
+
+      await register({
+        email: email.trim(),
+        password,
+        role,
+        name: name.trim(),
+        location,
+      });
       Alert.alert(
         "Akun dibuat",
         "Silakan masuk dengan email dan kata sandimu.",
@@ -65,7 +101,7 @@ export default function Register() {
       <StatusBar style="dark" />
       <SafeAreaView className="flex-1">
         <ScrollView
-          contentContainerClassName="px-6 pb-8"
+          contentContainerClassName="px-7 pb-8"
           keyboardShouldPersistTaps="handled"
         >
           {/* Top bar */}
@@ -76,7 +112,7 @@ export default function Register() {
             <Text className="font-archivo-semibold text-body text-ink">Buat akun</Text>
           </View>
 
-          <Text className="mt-2 font-archivo-bold text-judul leading-tight text-ink">
+          <Text className="mt-2 font-archivo-black text-judul leading-tight text-ink">
             Kamu bergabung{"\n"}sebagai?
           </Text>
           <Text className="mb-5 mt-2 font-archivo text-body text-ink-muted">
@@ -110,7 +146,7 @@ export default function Register() {
             onChangeText={setName}
             placeholder={namePlaceholder}
             placeholderTextColor="#9b9797"
-            className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+            className="mb-5 h-14 rounded-card border border-line px-4 font-archivo text-body text-ink"
           />
 
           <Text className="mb-2 font-archivo-medium text-caption text-ink">Email</Text>
@@ -121,7 +157,7 @@ export default function Register() {
             placeholderTextColor="#9b9797"
             autoCapitalize="none"
             keyboardType="email-address"
-            className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+            className="mb-5 h-14 rounded-card border border-line px-4 font-archivo text-body text-ink"
           />
 
           <Text className="mb-2 font-archivo-medium text-caption text-ink">
@@ -133,7 +169,7 @@ export default function Register() {
             placeholder="Min. 8 karakter"
             placeholderTextColor="#9b9797"
             secureTextEntry
-            className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+            className="mb-5 h-14 rounded-card border border-line px-4 font-archivo text-body text-ink"
           />
 
           {/* Persetujuan */}
@@ -157,7 +193,7 @@ export default function Register() {
           <Pressable
             onPress={onSubmit}
             disabled={loading}
-            className="items-center rounded-pill bg-primary py-4 active:bg-primary-dark"
+            className="h-14 items-center justify-center rounded-pill bg-primary active:bg-primary-dark"
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -189,12 +225,12 @@ function RoleCard({
   return (
     <Pressable
       onPress={onPress}
-      className={`flex-row items-start rounded-[18px] border p-4 ${
+      className={`flex-row items-start rounded-[18px] border p-5 ${
         selected ? "border-primary bg-primary-soft" : "border-line bg-surface"
       }`}
     >
       <View
-        className={`mr-3 h-10 w-10 items-center justify-center rounded-card ${
+        className={`mr-3 h-12 w-12 items-center justify-center rounded-card ${
           selected ? "bg-primary" : "bg-ground"
         }`}
       >

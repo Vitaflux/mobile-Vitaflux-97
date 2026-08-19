@@ -34,7 +34,7 @@ export default function Onboarding() {
   return (
     <View className="flex-1 bg-surface">
       <StatusBar style="dark" />
-      <SafeAreaView className="flex-1 px-6">
+      <SafeAreaView className="flex-1 px-8">
         {/* Lewati */}
         <View className="h-10 flex-row items-center justify-end">
           <Pressable onPress={goLogin} hitSlop={8}>
@@ -45,7 +45,7 @@ export default function Onboarding() {
         </View>
 
         {/* Ilustrasi (placeholder) */}
-        <View className="mt-2 h-64 items-center justify-center rounded-[18px] bg-primary-soft">
+        <View className="mt-2 h-72 items-center justify-center rounded-sheet border border-dashed border-primary-tint bg-primary-soft">
           <Text className="font-archivo-bold text-overline tracking-overline text-primary-dark">
             ILUSTRASI
           </Text>
@@ -55,7 +55,7 @@ export default function Onboarding() {
         </View>
 
         {/* Judul + body */}
-        <Text className="mt-8 font-archivo-bold text-judul leading-tight text-ink">
+        <Text className="mt-8 font-archivo-black text-display leading-tight text-ink">
           {step.title}
         </Text>
         <Text className="mt-3 font-archivo text-body leading-6 text-ink-muted">
@@ -81,7 +81,7 @@ export default function Onboarding() {
         {/* Lanjut / Mulai */}
         <Pressable
           onPress={next}
-          className="mb-2 items-center rounded-pill bg-primary py-4 active:bg-primary-dark"
+          className="mb-2 h-14 items-center justify-center rounded-pill bg-primary active:bg-primary-dark"
         >
           <Text className="font-archivo-bold text-body text-white">
             {last ? "Mulai" : "Lanjut"}

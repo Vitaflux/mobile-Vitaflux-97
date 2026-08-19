@@ -1,6 +1,14 @@
 import { api } from "./client";
 import type { DonorRequest } from "../types/models";
 
+export interface ApplicantRequest extends DonorRequest {
+  donor: {
+    name: string | null;
+    blood_type: string;
+    rhesus: string;
+  } | null;
+}
+
 export type CheckInInput = {
   qr_token?: string;
   code?: string;
@@ -25,7 +33,9 @@ export async function registerToBlood(
 
 // Facility: pendaftar untuk sebuah kebutuhan.
 export async function applicantsForBlood(bloodId: string) {
-  const { data } = await api.get<DonorRequest[]>(`/requests/blood/${bloodId}`);
+  const { data } = await api.get<ApplicantRequest[]>(
+    `/requests/blood/${bloodId}`,
+  );
 
   return data;
 }

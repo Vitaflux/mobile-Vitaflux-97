@@ -66,15 +66,29 @@ describe('RequestsService check-in schedule validation', () => {
       })),
     };
 
+    const profileUpdate = jest.fn().mockResolvedValue(undefined);
+
+    const userProfileModel = {
+      where: jest.fn(() => ({
+        update: profileUpdate,
+      })),
+    };
+
     const service = new RequestsService(
       requestModel as unknown as Request,
       bloodModel as unknown as Blood,
-      {} as UserProfile,
+      userProfileModel as unknown as UserProfile,
       hospitalModel as unknown as Hospital,
       {} as User,
     );
 
-    return { service, update, requestModel };
+    return {
+      service,
+      update,
+      requestModel,
+      userProfileModel,
+      profileUpdate,
+    };
   }
 
   beforeEach(() => {
@@ -117,7 +131,7 @@ describe('RequestsService check-in schedule validation', () => {
   });
 
   it('completes check-in during the active donation schedule', async () => {
-    const { service, update } = createService(
+    const { service, update, userProfileModel, profileUpdate } = createService(
       new Date('2026-08-18T07:00:00.000Z'),
       new Date('2026-08-18T09:00:00.000Z'),
     );
@@ -134,6 +148,10 @@ describe('RequestsService check-in schedule validation', () => {
       status: 'done',
       checked_in_at: now,
       volume_ml: 350,
+    });
+    expect(userProfileModel.where).toHaveBeenCalledWith('_id', profileId);
+    expect(profileUpdate).toHaveBeenCalledWith({
+      last_donor: now,
     });
   });
 
@@ -163,5 +181,74 @@ describe('RequestsService check-in schedule validation', () => {
     await expect(service.checkInForFacility(userId.toString())).rejects.toThrow(
       new BadRequestException('QR token or code is required'),
     );
+  });
+
+  it('includes the blood component in completed donor history', async () => {
+    const donorRequest = {
+      _id: requestId,
+      bloods_id: bloodId,
+      status: 'done' as const,
+      qr_token: qrToken,
+      code: 'VF-8241',
+      checked_in_at: now,
+      volume_ml: 350,
+    };
+    const profile = {
+      _id: profileId,
+      user_id: userId,
+    };
+    const blood = {
+      _id: bloodId,
+      hospitals_id: hospitalId,
+      blood_type: 'O',
+      rhesus: '+',
+      quantity: 10,
+      status_blood: 'open',
+      schedule: now,
+      title: 'Pasien operasi jantung',
+      component: 'whole_blood',
+    };
+    const hospital = {
+      _id: hospitalId,
+      hospital_name: 'RS Test',
+      address: 'Bandung',
+      location: {
+        type: 'Point',
+        coordinates: [107.6191, -6.9175],
+      },
+    };
+    const requestModel = {
+      where: jest.fn(() => ({
+        where: jest.fn(() => ({
+          get: jest.fn().mockResolvedValue([donorRequest]),
+        })),
+      })),
+    };
+    const bloodModel = {
+      where: jest.fn(() => ({
+        first: jest.fn().mockResolvedValue(blood),
+      })),
+    };
+    const userProfileModel = {
+      where: jest.fn(() => ({
+        first: jest.fn().mockResolvedValue(profile),
+      })),
+    };
+    const hospitalModel = {
+      where: jest.fn(() => ({
+        first: jest.fn().mockResolvedValue(hospital),
+      })),
+    };
+    const service = new RequestsService(
+      requestModel as unknown as Request,
+      bloodModel as unknown as Blood,
+      userProfileModel as unknown as UserProfile,
+      hospitalModel as unknown as Hospital,
+      {} as User,
+    );
+
+    const result = await service.findMineForDonor(userId.toString(), 'done');
+
+    expect(result.data[0].blood?.component).toBe('whole_blood');
   });
 });

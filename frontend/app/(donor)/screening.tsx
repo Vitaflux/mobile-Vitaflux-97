@@ -138,7 +138,7 @@ export default function Screening() {
   }
 
   return (
-    <View className="flex-1 bg-ground">
+    <View className="flex-1 bg-surface">
       <StatusBar style="dark" />
       <SafeAreaView className="flex-1">
         <ScrollView
@@ -151,7 +151,7 @@ export default function Screening() {
               <Pressable onPress={() => router.back()} hitSlop={8} className="mr-3">
                 <Text className="text-2xl text-ink">←</Text>
               </Pressable>
-              <Text className="font-archivo-semibold text-body text-ink">
+              <Text className="font-archivo-bold text-body text-ink">
                 Skrining kesehatan
               </Text>
             </View>
@@ -160,7 +160,14 @@ export default function Screening() {
             </Text>
           </View>
 
-          <Text className="mt-2 font-archivo text-body text-ink-muted">
+          <View className="h-1.5 overflow-hidden rounded-pill bg-line">
+            <View
+              className="h-full rounded-pill bg-primary"
+              style={{ width: `${(answeredCount / total) * 100}%` }}
+            />
+          </View>
+
+          <Text className="mt-4 font-archivo text-body text-ink-muted">
             Jawab jujur ya — ini hanya penyaringan awal. Petugas tetap memeriksa
             ulang di lokasi.
           </Text>
@@ -179,7 +186,7 @@ export default function Screening() {
                 keyboardType="numeric"
                 placeholder="mis. 60"
                 placeholderTextColor="#9b9797"
-                className="rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+                className="h-14 rounded-card border border-line bg-surface px-4 font-archivo text-body text-ink"
               />
             )}
           />
@@ -207,7 +214,7 @@ export default function Screening() {
                         <Pressable
                           key={opt}
                           onPress={() => onChange(opt)}
-                          className={`flex-1 items-center rounded-card border py-3 ${
+                          className={`h-12 flex-1 items-center justify-center rounded-card border ${
                             active
                               ? "border-primary bg-primary"
                               : "border-line bg-surface"
@@ -231,7 +238,7 @@ export default function Screening() {
         </ScrollView>
 
         {/* Banner hasil + CTA */}
-        <View className="border-t border-line bg-ground px-6 pb-2 pt-3">
+        <View className="border-t border-line bg-surface px-6 pb-2 pt-3">
           <View
             className={`mb-3 rounded-[18px] border p-4 ${
               elig.ok ? "border-primary bg-primary-soft" : "border-line bg-surface"

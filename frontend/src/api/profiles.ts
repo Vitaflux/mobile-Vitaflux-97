@@ -10,7 +10,6 @@ export interface UpdateProfileInput {
   blood_type: BloodType;
   rhesus: Rhesus;
   location: GeoPoint;
-  last_donor?: string | null;
   birth_date?: string | null;
   weight_kg?: number | null;
   city?: string | null;

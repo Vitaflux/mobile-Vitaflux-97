@@ -1,9 +1,10 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { UpdateHospitalDto } from './dto/update-hospital.dto';
 import { HospitalsService } from './hospitals.service';
 
 interface AuthenticatedRequest extends Request {
@@ -19,5 +20,18 @@ export class HospitalsController {
   @Roles('facility')
   getMine(@Req() request: AuthenticatedRequest) {
     return this.hospitalsService.getForFacility(request.user.userId);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('facility')
+  updateMine(
+    @Req() request: AuthenticatedRequest,
+    @Body() updateHospitalDto: UpdateHospitalDto,
+  ) {
+    return this.hospitalsService.updateForFacility(
+      request.user.userId,
+      updateHospitalDto,
+    );
   }
 }

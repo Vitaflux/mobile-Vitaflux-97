@@ -13,22 +13,15 @@ import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QrCode } from "lucide-react-native";
-import { applicantsForBlood, confirmRequest } from "../../src/api/requests";
+import {
+  applicantsForBlood,
+  confirmRequest,
+  type ApplicantRequest,
+} from "../../src/api/requests";
 import { getBlood } from "../../src/api/bloods";
 import { errorMessage } from "../../src/lib/errorMessage";
 
 type ApplicantStatus = "registered" | "confirmed" | "done";
-
-type Applicant = {
-  id: string;
-  donor: {
-    name: string | null;
-    blood_type: string;
-    rhesus: string;
-  } | null;
-  status: ApplicantStatus;
-  qr_token?: string;
-};
 
 type BloodContext = {
   id: string;
@@ -85,7 +78,7 @@ export default function Applicants() {
   });
 
   const blood = bloodQuery.data as BloodContext | undefined;
-  const applicants = (applicantQuery.data ?? []) as Applicant[];
+  const applicants = applicantQuery.data ?? [];
 
   const filteredApplicants =
     filter === "all"
@@ -138,7 +131,7 @@ export default function Applicants() {
       <SafeAreaView className="flex-1">
         {/* Header */}
         <View className="px-6">
-          <View className="flex-row items-center h-12">
+          <View className="min-h-16 flex-row items-center py-2">
             {bloodId ? (
               <Pressable
                 onPress={() => router.back()}
@@ -147,6 +140,17 @@ export default function Applicants() {
               >
                 <Text className="text-2xl text-ink">←</Text>
               </Pressable>
+            ) : null}
+
+            {blood ? (
+              <View className="mr-3 h-14 w-14 items-center justify-center rounded-card bg-primary">
+                <Text className="font-archivo-black text-subjudul text-white">
+                  {blood.blood_type}
+                </Text>
+                <Text className="font-archivo-bold text-caption text-white">
+                  {blood.rhesus}
+                </Text>
+              </View>
             ) : null}
 
             <View className="flex-1">
@@ -159,15 +163,14 @@ export default function Applicants() {
 
               {blood ? (
                 <Text className="mt-0.5 font-archivo text-caption text-ink-muted">
-                  {blood.blood_type}
-                  {blood.rhesus} · {blood.quantity} kantong
+                  {blood.quantity} kantong
                 </Text>
               ) : null}
             </View>
           </View>
 
           {bloodId && applicants.length > 0 ? (
-            <View className="flex-row gap-2 mt-3">
+            <View className="mt-2 flex-row gap-2">
               <Summary value={registeredCount} label="Terdaftar" />
 
               <Summary value={confirmedCount} label="Konfirmasi" accent />
@@ -299,14 +302,14 @@ function ApplicantCard({
   confirming,
   onConfirm,
 }: {
-  applicant: Applicant;
+  applicant: ApplicantRequest;
   confirming: boolean;
   onConfirm: () => void;
 }) {
   return (
     <View className="rounded-[18px] border border-line bg-surface p-4">
       <View className="flex-row items-center">
-        <View className="items-center justify-center mr-3 h-11 w-11 rounded-card bg-primary-soft">
+        <View className="mr-3 h-11 w-11 items-center justify-center rounded-pill bg-primary-soft">
           <Text className="font-archivo-black text-body text-primary-dark">
             {(applicant.donor?.name?.[0] ?? "?").toUpperCase()}
           </Text>
@@ -409,12 +412,12 @@ function Summary({
 }) {
   return (
     <View
-      className={`flex-1 rounded-card border p-3 ${
+      className={`flex-1 rounded-card border px-3 py-2 ${
         accent ? "border-primary bg-primary-soft" : "border-line bg-surface"
       }`}
     >
       <Text
-        className={`font-archivo-black text-subjudul ${
+        className={`font-archivo-black text-body ${
           accent ? "text-primary-dark" : "text-ink"
         }`}
       >
@@ -425,7 +428,7 @@ function Summary({
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.7}
-        className="mt-1 font-archivo text-caption text-ink-muted"
+        className="font-archivo text-caption text-ink-muted"
       >
         {label}
       </Text>

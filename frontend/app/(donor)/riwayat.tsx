@@ -19,6 +19,8 @@ import {
 } from "lucide-react-native";
 
 import { myRequests } from "../../src/api/requests";
+import { getMyProfile } from "../../src/api/profiles";
+import { useAuth } from "../../src/store/auth";
 
 type BloodComponent = "whole_blood" | "plasma" | "trombosit" | "eritrosit";
 
@@ -114,17 +116,25 @@ function formatLiter(volumeMl: number) {
 export default function Riwayat() {
   const [flipped, setFlipped] = useState(false);
   const flipValue = useRef(new Animated.Value(0)).current;
+  const user = useAuth((state) => state.user);
 
   const q = useQuery({
     queryKey: ["my-requests", "done"],
     queryFn: () => myRequests("done"),
   });
 
+  const profileQuery = useQuery({
+    queryKey: ["profile"],
+    queryFn: getMyProfile,
+    retry: false,
+  });
+
   const histories = ([...(q.data ?? [])] as HistoryRequest[]).sort(
     (first, second) => getHistoryTime(second) - getHistoryTime(first),
   );
 
-  const totalDonations = histories.length;
+  const totalDonations =
+    profileQuery.data?.stats?.total_donations ?? histories.length;
 
   // Backend saat ini menghitung satu donasi selesai sebagai satu nyawa terbantu.
   const livesHelped = totalDonations;
@@ -135,6 +145,15 @@ export default function Riwayat() {
   );
 
   const latestHistory = histories[0] ?? null;
+
+  const lastDonor =
+    profileQuery.data?.last_donor ??
+    latestHistory?.checked_in_at ??
+    latestHistory?.blood?.schedule;
+
+  async function onRefresh() {
+    await Promise.all([q.refetch(), profileQuery.refetch()]);
+  }
 
   function toggleCard() {
     const nextFlipped = !flipped;
@@ -168,8 +187,8 @@ export default function Riwayat() {
           contentContainerClassName="px-6 pb-10"
           refreshControl={
             <RefreshControl
-              refreshing={q.isFetching}
-              onRefresh={() => q.refetch()}
+              refreshing={q.isFetching || profileQuery.isFetching}
+              onRefresh={onRefresh}
             />
           }
         >
@@ -227,7 +246,7 @@ export default function Riwayat() {
 
               <Pressable
                 onPress={toggleCard}
-                className="relative h-[230px] mt-3"
+                className="relative h-56 mt-3"
               >
                 {/* Sisi depan */}
                 <Animated.View
@@ -244,10 +263,10 @@ export default function Riwayat() {
 
                   <View className="absolute w-32 h-32 rounded-pill -bottom-16 -left-10 bg-white/10" />
 
-                  <View className="justify-between flex-1 p-6">
+                  <View className="justify-between flex-1 p-5">
                     <View className="flex-row items-start justify-between">
                       <View>
-                        <Text className="text-white font-archivo-black text-subjudul">
+                        <Text className="text-white font-archivo-black text-body">
                           VITAFLUX
                         </Text>
 
@@ -256,24 +275,47 @@ export default function Riwayat() {
                         </Text>
                       </View>
 
-                      <Droplets color="#FFFFFF" size={32} />
+                      <Droplets color="#FFFFFF" size={24} />
                     </View>
 
                     <View>
-                      <Text className="font-archivo-black text-[42px] leading-[48px] text-white">
-                        {totalDonations}
-                      </Text>
+                      <View className="flex-row items-end justify-between">
+                        <View className="flex-1 mr-4">
+                          {user?.name ? (
+                            <Text className="text-white font-archivo-bold text-subjudul">
+                              {user.name}
+                            </Text>
+                          ) : null}
 
-                      <Text className="text-white font-archivo-bold text-body">
-                        Donasi selesai
-                      </Text>
+                          {profileQuery.data?.city ? (
+                            <Text className="mt-1 text-white/80 font-archivo text-caption">
+                              {profileQuery.data.city}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        {profileQuery.data ? (
+                          <View className="items-center justify-center px-4 py-2 border rounded-card border-white/30 bg-white/10">
+                            <Text className="text-white font-archivo-black text-subjudul">
+                              {profileQuery.data.blood_type}
+                              {profileQuery.data.rhesus}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      <View className="flex-row items-end mt-2">
+                        <Text className="text-white font-archivo-black text-judul leading-tight">
+                          {totalDonations}
+                        </Text>
+
+                        <Text className="ml-2 text-white font-archivo-bold text-caption">
+                          donasi selesai
+                        </Text>
+                      </View>
 
                       <Text className="mt-1 text-white/80 font-archivo text-caption">
-                        Terakhir:{" "}
-                        {formatDate(
-                          latestHistory?.checked_in_at ??
-                            latestHistory?.blood?.schedule,
-                        )}
+                        Donor terakhir: {formatDate(lastDonor)}
                       </Text>
                     </View>
 
@@ -298,22 +340,28 @@ export default function Riwayat() {
                     ],
                   }}
                 >
-                  <View className="justify-between flex-1 p-6">
+                  <View className="justify-between flex-1 p-5">
                     <View className="flex-row items-start justify-between">
                       <View>
-                        <Text className="text-white font-archivo-black text-subjudul">
+                        <Text className="text-white font-archivo-black text-body">
                           Dampak donasimu
                         </Text>
 
                         <Text className="mt-1 text-white/70 font-archivo text-caption">
                           Terima kasih sudah membantu sesama.
                         </Text>
+
+                        {profileQuery.data?.stats?.member_since_year ? (
+                          <Text className="mt-1 text-white/70 font-archivo-semibold text-caption">
+                            Anggota sejak {profileQuery.data.stats.member_since_year}
+                          </Text>
+                        ) : null}
                       </View>
 
-                      <HeartPulse color="#EC3013" size={30} />
+                      <HeartPulse color="#EC3013" size={24} />
                     </View>
 
-                    <View className="flex-row gap-2 mt-5">
+                    <View className="flex-row gap-2 mt-3">
                       <ImpactStat
                         value={String(totalDonations)}
                         label="Donasi"
@@ -327,7 +375,7 @@ export default function Riwayat() {
                       />
                     </View>
 
-                    <View className="flex-row items-center mt-5">
+                    <View className="flex-row items-center mt-3">
                       <RotateCcw color="#FFFFFF" size={15} />
 
                       <Text className="ml-2 text-white/70 font-archivo text-caption">
@@ -339,7 +387,7 @@ export default function Riwayat() {
               </Pressable>
 
               {/* Ringkasan */}
-              <Text className="mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
+              <Text className="mt-5 font-archivo-bold text-overline tracking-overline text-ink-muted">
                 RINGKASAN
               </Text>
 
@@ -355,15 +403,17 @@ export default function Riwayat() {
               </View>
 
               {/* Daftar */}
-              <Text className="mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
+              <Text className="mt-6 font-archivo-bold text-overline tracking-overline text-ink-muted">
                 DAFTAR DONASI
               </Text>
 
-              <View className="gap-3 mt-3">
-                {histories.map((history) => (
+              <View className="mt-3 overflow-hidden border rounded-card border-line bg-surface">
+                {histories.map((history, index) => (
                   <View
                     key={history.id}
-                    className="p-5 border rounded-card border-line bg-surface"
+                    className={`p-4 bg-surface ${
+                      index < histories.length - 1 ? "border-b border-line" : ""
+                    }`}
                   >
                     <View className="flex-row items-start justify-between">
                       <View className="flex-1 mr-3">
@@ -390,30 +440,32 @@ export default function Riwayat() {
                       </View>
                     </View>
 
-                    <View className="pt-4 mt-4 border-t border-line">
-                      <DetailRow
-                        label="Golongan"
-                        value={
-                          history.blood
-                            ? `${history.blood.blood_type}${history.blood.rhesus}`
-                            : "-"
-                        }
-                      />
+                    <View className="flex-row flex-wrap items-center mt-3">
+                      <Text className="font-archivo-semibold text-caption text-ink">
+                        {history.blood
+                          ? `${history.blood.blood_type}${history.blood.rhesus}`
+                          : "-"}
+                      </Text>
 
-                      <DetailRow
-                        label="Komponen"
-                        value={formatComponent(history.blood?.component)}
-                      />
+                      <Text className="mx-2 font-archivo text-caption text-ink-muted">
+                        ·
+                      </Text>
 
-                      <DetailRow
-                        label="Volume"
-                        value={formatVolume(history.volume_ml)}
-                        last
-                      />
+                      <Text className="font-archivo text-caption text-ink-muted">
+                        {formatComponent(history.blood?.component)}
+                      </Text>
+
+                      <Text className="mx-2 font-archivo text-caption text-ink-muted">
+                        ·
+                      </Text>
+
+                      <Text className="font-archivo-semibold text-caption text-ink">
+                        {formatVolume(history.volume_ml)}
+                      </Text>
                     </View>
 
                     {history.hospital?.address ? (
-                      <Text className="pt-3 mt-3 border-t font-archivo text-caption text-ink-muted border-line">
+                      <Text className="mt-2 font-archivo text-caption text-ink-muted">
                         {history.hospital.address}
                       </Text>
                     ) : null}
@@ -430,8 +482,8 @@ export default function Riwayat() {
 
 function ImpactStat({ value, label }: { value: string; label: string }) {
   return (
-    <View className="items-center flex-1 px-2 py-3 rounded-card bg-white/10">
-      <Text className="text-white font-archivo-black text-subjudul">
+    <View className="items-center flex-1 px-2 py-2 rounded-card bg-white/10">
+      <Text className="text-white font-archivo-black text-body">
         {value}
       </Text>
 
@@ -444,8 +496,8 @@ function ImpactStat({ value, label }: { value: string; label: string }) {
 
 function SummaryCard({ value, label }: { value: string; label: string }) {
   return (
-    <View className="flex-1 p-3 border rounded-card border-line bg-surface">
-      <Text className="font-archivo-black text-subjudul text-primary">
+    <View className="flex-1 px-3 py-2 border rounded-card border-line bg-surface">
+      <Text className="font-archivo-black text-body text-primary">
         {value}
       </Text>
 
@@ -454,28 +506,6 @@ function SummaryCard({ value, label }: { value: string; label: string }) {
         numberOfLines={2}
       >
         {label}
-      </Text>
-    </View>
-  );
-}
-
-function DetailRow({
-  label,
-  value,
-  last = false,
-}: {
-  label: string;
-  value: string;
-  last?: boolean;
-}) {
-  return (
-    <View
-      className={`flex-row items-center justify-between ${last ? "" : "mb-3"}`}
-    >
-      <Text className="font-archivo text-caption text-ink-muted">{label}</Text>
-
-      <Text className="font-archivo-semibold text-caption text-ink">
-        {value}
       </Text>
     </View>
   );

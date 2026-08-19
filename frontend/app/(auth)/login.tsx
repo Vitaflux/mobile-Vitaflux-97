@@ -54,13 +54,13 @@ export default function Login() {
   return (
     <View className="flex-1 bg-surface">
       <StatusBar style="dark" />
-      <SafeAreaView className="flex-1 px-6">
-        <View className="justify-center flex-1">
-          <View className="items-center justify-center w-12 h-12 mb-6 rounded-card bg-primary">
+      <SafeAreaView className="flex-1 px-7">
+        <View className="pt-10">
+          <View className="mb-6 h-14 w-14 items-center justify-center rounded-card bg-primary">
             <Text className="text-xl text-white font-archivo-black">V</Text>
           </View>
 
-          <Text className="leading-tight font-archivo-bold text-judul text-ink">
+          <Text className="font-archivo-black text-display leading-tight text-ink">
             Selamat datang{"\n"}kembali
           </Text>
           <Text className="mt-2 mb-8 font-archivo text-body text-ink-muted">
@@ -77,20 +77,20 @@ export default function Login() {
             placeholderTextColor="#9b9797"
             autoCapitalize="none"
             keyboardType="email-address"
-            className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+            className="mb-5 h-14 rounded-card border border-line px-4 font-archivo text-body text-ink"
           />
 
           <Text className="mb-2 font-archivo-medium text-caption text-ink">
             Kata sandi
           </Text>
-          <View className="flex-row items-center px-4 border rounded-card border-line">
+          <View className="h-14 flex-row items-center rounded-card border border-line px-4">
             <TextInput
               value={password}
               onChangeText={setPassword}
               placeholder="••••••••"
               placeholderTextColor="#9b9797"
               secureTextEntry={!show}
-              className="flex-1 py-[14px] font-archivo text-body text-ink"
+              className="h-full flex-1 font-archivo text-body text-ink"
             />
             <Pressable onPress={() => setShow((v) => !v)} hitSlop={8}>
               <Text className="font-archivo-medium text-caption text-ink-muted">
@@ -112,7 +112,7 @@ export default function Login() {
           <Pressable
             onPress={onSubmit}
             disabled={loading}
-            className="items-center py-4 rounded-pill bg-primary active:bg-primary-dark"
+            className="h-14 items-center justify-center rounded-pill bg-primary active:bg-primary-dark"
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -133,26 +133,27 @@ export default function Login() {
 
           <Pressable
             onPress={() => Alert.alert("Google", "Login Google menyusul.")}
-            className="items-center justify-center py-4 border rounded-pill border-line"
+            className="h-14 items-center justify-center rounded-pill border border-line"
           >
             <Text className="font-archivo-semibold text-body text-ink">
               Lanjut dengan Google
             </Text>
           </Pressable>
 
-          <View className="flex-row justify-center mt-6">
-            <Text className="font-archivo text-body text-ink-muted">
-              Belum punya akun?{" "}
+        </View>
+
+        <View className="mt-auto flex-row justify-center pb-4 pt-6">
+          <Text className="font-archivo text-body text-ink-muted">
+            Belum punya akun?{" "}
+          </Text>
+          <Pressable
+            onPress={() => router.push("/(auth)/register")}
+            hitSlop={8}
+          >
+            <Text className="font-archivo-bold text-body text-primary-dark">
+              Daftar
             </Text>
-            <Pressable
-              onPress={() => router.push("/(auth)/register")}
-              hitSlop={8}
-            >
-              <Text className="font-archivo-bold text-body text-primary-dark">
-                Daftar
-              </Text>
-            </Pressable>
-          </View>
+          </Pressable>
         </View>
       </SafeAreaView>
     </View>

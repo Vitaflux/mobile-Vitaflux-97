@@ -7,7 +7,26 @@ import { InjectModel } from '@mongoloquent/nestjs';
 import { ObjectId } from 'mongodb';
 import { Blood } from '../bloods/entities/blood.model';
 import { Request } from '../requests/entities/request.model';
+import { UpdateHospitalDto } from './dto/update-hospital.dto';
 import { Hospital } from './entities/hospital.model';
+
+const JAKARTA_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+function getJakartaDayBounds(now: Date) {
+  const jakartaNow = new Date(now.getTime() + JAKARTA_UTC_OFFSET_MS);
+  const jakartaMidnightAsUtc = Date.UTC(
+    jakartaNow.getUTCFullYear(),
+    jakartaNow.getUTCMonth(),
+    jakartaNow.getUTCDate(),
+  );
+
+  const start = jakartaMidnightAsUtc - JAKARTA_UTC_OFFSET_MS;
+
+  return {
+    start,
+    end: start + 24 * 60 * 60 * 1000,
+  };
+}
 
 @Injectable()
 export class HospitalsService {
@@ -55,6 +74,17 @@ export class HospitalsService {
       (request) => request.status === 'done',
     ).length;
 
+    const today = getJakartaDayBounds(new Date());
+    const doneTodayCount = requests.filter((request) => {
+      if (request.status !== 'done' || !request.checked_in_at) {
+        return false;
+      }
+
+      const checkedInAt = new Date(request.checked_in_at).getTime();
+
+      return checkedInAt >= today.start && checkedInAt < today.end;
+    }).length;
+
     const confirmedCount = requests.filter(
       (request) => request.status === 'confirmed',
     ).length;
@@ -82,8 +112,53 @@ export class HospitalsService {
         stats: {
           total_collected: doneCount,
           attendance_rate: attendanceRate,
+          done_today: doneTodayCount,
         },
       },
     };
+  }
+
+  async updateForFacility(
+    userId: string,
+    updateHospitalDto: UpdateHospitalDto,
+  ) {
+    if (!ObjectId.isValid(userId)) {
+      throw new UnauthorizedException('Invalid authenticated user');
+    }
+
+    const hospital = await this.hospitalModel
+      .where('user_id', new ObjectId(userId))
+      .first();
+
+    if (!hospital) {
+      throw new NotFoundException(
+        'Hospital profile was not found for this facility',
+      );
+    }
+
+    const metadata = {
+      ...(updateHospitalDto.hospital_name !== undefined
+        ? { hospital_name: updateHospitalDto.hospital_name.trim() }
+        : {}),
+      ...(updateHospitalDto.address !== undefined
+        ? { address: updateHospitalDto.address?.trim() || null }
+        : {}),
+      ...(updateHospitalDto.unit_donor !== undefined
+        ? { unit_donor: updateHospitalDto.unit_donor?.trim() || null }
+        : {}),
+      ...(updateHospitalDto.pic_name !== undefined
+        ? { pic_name: updateHospitalDto.pic_name?.trim() || null }
+        : {}),
+      ...(updateHospitalDto.contact !== undefined
+        ? { contact: updateHospitalDto.contact?.trim() || null }
+        : {}),
+      ...(updateHospitalDto.hospital_type !== undefined
+        ? { hospital_type: updateHospitalDto.hospital_type?.trim() || null }
+        : {}),
+    };
+
+    await this.hospitalModel.where('_id', hospital._id).update(metadata);
+
+    return this.getForFacility(userId);
   }
 }

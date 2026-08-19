@@ -2,8 +2,11 @@ import { Platform } from "react-native";
 import * as Calendar from "expo-calendar";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
+import {
+  getDonorReminderStorageKey,
+  rescheduleReminderIfEligibilityChanged,
+} from "./reminderFlow";
 
-const STORAGE_KEY = "vitaflux_donor_reminder";
 const CHANNEL_ID = "donor-reminders";
 
 export type ReminderTiming = "h-3" | "day";
@@ -62,21 +65,24 @@ async function prepareNotificationPermission() {
   }
 }
 
-export async function getDonorReminder(): Promise<DonorReminder | null> {
-  const stored = await SecureStore.getItemAsync(STORAGE_KEY);
+export async function getDonorReminder(
+  userId: string,
+): Promise<DonorReminder | null> {
+  const storageKey = getDonorReminderStorageKey(userId);
+  const stored = await SecureStore.getItemAsync(storageKey);
 
   if (!stored) return null;
 
   try {
     return JSON.parse(stored) as DonorReminder;
   } catch {
-    await SecureStore.deleteItemAsync(STORAGE_KEY);
+    await SecureStore.deleteItemAsync(storageKey);
     return null;
   }
 }
 
-export async function cancelDonorReminder() {
-  const previous = await getDonorReminder();
+export async function cancelDonorReminder(userId: string) {
+  const previous = await getDonorReminder(userId);
 
   if (previous?.notificationId) {
     try {
@@ -88,10 +94,11 @@ export async function cancelDonorReminder() {
     }
   }
 
-  await SecureStore.deleteItemAsync(STORAGE_KEY);
+  await SecureStore.deleteItemAsync(getDonorReminderStorageKey(userId));
 }
 
 export async function scheduleDonorReminder(
+  userId: string,
   eligibleAt: string,
   timing: ReminderTiming,
 ): Promise<DonorReminder> {
@@ -102,7 +109,7 @@ export async function scheduleDonorReminder(
   }
 
   await prepareNotificationPermission();
-  await cancelDonorReminder();
+  await cancelDonorReminder(userId);
 
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
@@ -134,9 +141,27 @@ export async function scheduleDonorReminder(
     timing,
   };
 
-  await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(reminder));
+  await SecureStore.setItemAsync(
+    getDonorReminderStorageKey(userId),
+    JSON.stringify(reminder),
+  );
 
   return reminder;
+}
+
+export async function syncDonorReminderEligibility(
+  userId: string,
+  eligibleAt: string | null,
+) {
+  const previous = await getDonorReminder(userId);
+
+  return rescheduleReminderIfEligibilityChanged(
+    previous,
+    eligibleAt,
+    () => cancelDonorReminder(userId),
+    (nextEligibleAt, timing) =>
+      scheduleDonorReminder(userId, nextEligibleAt, timing),
+  );
 }
 
 export async function addEligibilityToCalendar(eligibleAt: string) {

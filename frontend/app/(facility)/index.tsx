@@ -109,9 +109,11 @@ export default function FacilityDashboard() {
     0,
   );
 
-  const doneCount = hospitalQuery.data?.stats.total_collected ?? 0;
+  const totalDoneCount = hospitalQuery.data?.stats.total_collected ?? 0;
 
-  const confirmedCount = Math.max(0, totalCollected - doneCount);
+  const doneTodayCount = hospitalQuery.data?.stats.done_today ?? 0;
+
+  const confirmedCount = Math.max(0, totalCollected - totalDoneCount);
 
   const refreshing = bloodQuery.isFetching || hospitalQuery.isFetching;
 
@@ -147,7 +149,7 @@ export default function FacilityDashboard() {
           {/* Header */}
           <View className="flex-row items-center justify-between mt-2">
             <View className="flex-row items-center flex-1">
-              <View className="items-center justify-center w-12 h-12 mr-3 rounded-card bg-primary">
+              <View className="items-center justify-center w-14 h-14 mr-3 rounded-card bg-ink">
                 <Text className="text-white font-archivo-black text-body">
                   RS
                 </Text>
@@ -155,7 +157,7 @@ export default function FacilityDashboard() {
 
               <View className="flex-1">
                 <Text
-                  className="font-archivo-bold text-subjudul text-ink"
+                  className="font-archivo-black text-subjudul text-ink"
                   numberOfLines={1}
                 >
                   {hospitalQuery.data?.hospital_name ??
@@ -223,27 +225,8 @@ export default function FacilityDashboard() {
 
                 <Stat value={confirmedCount} label="Dikonfirmasi" accent />
 
-                <Stat value={doneCount} label="Selesai" />
+                <Stat value={doneTodayCount} label="Selesai hari ini" />
               </View>
-
-              {/* Actions */}
-              <Pressable
-                onPress={() => router.push("/(facility)/create")}
-                className="items-center py-4 mt-5 rounded-pill bg-primary active:bg-primary-dark"
-              >
-                <Text className="text-white font-archivo-bold text-body">
-                  + Buat kebutuhan darah
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => router.push("/(facility)/scan")}
-                className="items-center py-4 mt-3 border rounded-pill border-line bg-surface active:bg-ground"
-              >
-                <Text className="font-archivo-semibold text-body text-ink">
-                  Scan QR check-in
-                </Text>
-              </Pressable>
 
               {/* Active requests */}
               <Text className="mb-3 mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
@@ -271,6 +254,25 @@ export default function FacilityDashboard() {
                   ))}
                 </View>
               )}
+
+              {/* Actions */}
+              <Pressable
+                onPress={() => router.push("/(facility)/create")}
+                className="items-center py-4 mt-5 rounded-pill bg-primary active:bg-primary-dark"
+              >
+                <Text className="text-white font-archivo-bold text-body">
+                  + Buat kebutuhan darah
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push("/(facility)/scan")}
+                className="items-center py-3 mt-3 border rounded-pill border-line bg-surface active:bg-ground"
+              >
+                <Text className="font-archivo-semibold text-caption text-ink">
+                  Scan QR check-in
+                </Text>
+              </Pressable>
             </>
           )}
         </ScrollView>
@@ -303,48 +305,73 @@ function BloodCard({
       onPress={onPress}
       className="rounded-[18px] border border-line bg-surface p-4 active:bg-ground"
     >
-      <View className="flex-row items-center justify-between">
+      <View className="flex-row items-start">
         <View
-          className={`rounded-pill px-3 py-1 ${
-            blood.status_blood === "urgent" ? "bg-primary" : "bg-ground"
+          className={`h-16 w-16 items-center justify-center rounded-[18px] border ${
+            blood.status_blood === "urgent"
+              ? "border-primary bg-primary"
+              : "border-line bg-ground"
           }`}
         >
           <Text
-            className={`font-archivo-bold text-overline tracking-overline ${
-              blood.status_blood === "urgent" ? "text-white" : "text-ink-muted"
+            className={`leading-none font-archivo-black text-judul ${
+              blood.status_blood === "urgent" ? "text-white" : "text-ink"
             }`}
           >
-            {blood.status_blood === "urgent" ? "MENDESAK" : "RUTIN"}
+            {blood.blood_type}
+          </Text>
+
+          <Text
+            className={`mt-1 font-archivo-bold text-caption ${
+              blood.status_blood === "urgent" ? "text-white" : "text-ink"
+            }`}
+          >
+            {blood.rhesus}
           </Text>
         </View>
 
-        <View className="px-3 py-1 rounded-pill bg-primary-soft">
-          <Text className="font-archivo-bold text-caption text-primary-dark">
-            {blood.blood_type}
-            {blood.rhesus}
+        <View className="flex-1 ml-4">
+          <View
+            className={`self-start rounded-pill px-3 py-1 ${
+              blood.status_blood === "urgent"
+                ? "bg-primary-soft"
+                : "bg-ground"
+            }`}
+          >
+            <Text
+              className={`font-archivo-bold text-overline tracking-overline ${
+                blood.status_blood === "urgent"
+                  ? "text-primary-dark"
+                  : "text-ink-muted"
+              }`}
+            >
+              {blood.status_blood === "urgent" ? "MENDESAK" : "RUTIN"}
+            </Text>
+          </View>
+
+          <Text className="mt-2 font-archivo-bold text-body text-ink">
+            {blood.title || "Kebutuhan darah"}
+          </Text>
+
+          {component ? (
+            <Text className="mt-1 font-archivo text-caption text-ink-muted">
+              {component}
+            </Text>
+          ) : null}
+
+          <Text className="mt-1 font-archivo text-caption text-ink-muted">
+            {formatSchedule(blood.schedule, blood.schedule_end)}
           </Text>
         </View>
       </View>
 
-      <Text className="mt-3 font-archivo-bold text-body text-ink">
-        {blood.title || "Kebutuhan darah"}
-      </Text>
+      <View className="h-px my-3 bg-line" />
 
-      {component ? (
-        <Text className="mt-1 font-archivo text-caption text-ink-muted">
-          {component}
-        </Text>
-      ) : null}
-
-      <Text className="mt-2 font-archivo text-caption text-ink-muted">
-        {formatSchedule(blood.schedule, blood.schedule_end)}
-      </Text>
-
-      <Text className="mt-3 font-archivo-semibold text-caption text-ink">
+      <Text className="font-archivo-semibold text-caption text-ink">
         {applicants} pendaftar · {collected} dari {blood.quantity} kantong
       </Text>
 
-      <View className="h-2 mt-2 overflow-hidden rounded-pill bg-ground">
+      <View className="h-1.5 mt-2 overflow-hidden rounded-pill bg-ground">
         <View
           className="h-full rounded-pill bg-primary"
           style={{
@@ -377,12 +404,12 @@ function Stat({
 }) {
   return (
     <View
-      className={`flex-1 rounded-[18px] border p-4 ${
+      className={`flex-1 rounded-card border p-3 ${
         accent ? "border-primary bg-primary-soft" : "border-line bg-surface"
       }`}
     >
       <Text
-        className={`font-archivo-black text-judul ${
+        className={`font-archivo-black text-subjudul ${
           accent ? "text-primary-dark" : "text-ink"
         }`}
       >

@@ -326,6 +326,12 @@ export class RequestsService {
       volume_ml: volumeMl ?? null,
     });
 
+    await this.userProfileModel
+      .where('_id', donorRequest.user_Profiles_id)
+      .update({
+        last_donor: checkedInAt,
+      });
+
     return {
       success: true,
       data: {
@@ -396,6 +402,7 @@ export class RequestsService {
                 status_blood: blood.status_blood,
                 schedule: blood.schedule,
                 title: blood.title ?? null,
+                component: blood.component ?? null,
               }
             : null,
           hospital: hospital

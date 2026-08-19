@@ -91,9 +91,12 @@ export class ProfilesService {
       .where('user_id', userObjectId)
       .first();
 
-    const lastDonor = updateDonorProfileDto.last_donor
-      ? new Date(updateDonorProfileDto.last_donor)
-      : null;
+    const lastDonor =
+      updateDonorProfileDto.last_donor === undefined
+        ? (existingProfile?.last_donor ?? null)
+        : updateDonorProfileDto.last_donor
+          ? new Date(updateDonorProfileDto.last_donor)
+          : null;
 
     const birthDate =
       updateDonorProfileDto.birth_date === undefined
@@ -109,7 +112,9 @@ export class ProfilesService {
         type: updateDonorProfileDto.location.type,
         coordinates: updateDonorProfileDto.location.coordinates,
       },
-      last_donor: lastDonor,
+      ...(updateDonorProfileDto.last_donor !== undefined
+        ? { last_donor: lastDonor }
+        : {}),
       ...(birthDate !== undefined ? { birth_date: birthDate } : {}),
       ...(updateDonorProfileDto.weight_kg !== undefined
         ? { weight_kg: updateDonorProfileDto.weight_kg }
@@ -135,6 +140,7 @@ export class ProfilesService {
     } else {
       const createdProfile = await this.userProfileModel.insert({
         user_id: userObjectId,
+        last_donor: lastDonor,
         ...profileData,
         push_token: null,
       });
@@ -152,7 +158,7 @@ export class ProfilesService {
         blood_type: profileData.blood_type,
         rhesus: profileData.rhesus,
         location: profileData.location,
-        last_donor: profileData.last_donor,
+        last_donor: lastDonor,
         birth_date:
           birthDate !== undefined
             ? birthDate

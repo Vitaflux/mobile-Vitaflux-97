@@ -2,6 +2,9 @@ import { create } from "zustand";
 import type { User } from "../types/models";
 import * as authApi from "../api/auth";
 import { clearToken, saveToken } from "../api/client";
+import { clearPushToken } from "../api/notifications";
+import { queryClient } from "../lib/queryClient";
+import { runLogoutFlow } from "../lib/logoutFlow";
 
 interface AuthState {
   user: User | null;
@@ -11,7 +14,7 @@ interface AuthState {
   logout: () => Promise<void>;
 }
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   status: "guest",
 
@@ -27,7 +30,14 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    await clearToken();
-    set({ user: null, status: "guest" });
+    const user = get().user;
+
+    await runLogoutFlow({
+      role: user?.role,
+      unregisterPushToken: clearPushToken,
+      clearLocalToken: clearToken,
+      clearUser: () => set({ user: null, status: "guest" }),
+      clearCache: () => queryClient.clear(),
+    });
   },
 }));

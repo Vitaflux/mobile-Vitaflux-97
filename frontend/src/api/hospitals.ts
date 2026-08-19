@@ -17,11 +17,27 @@ export type FacilityProfile = {
   stats: {
     total_collected: number;
     attendance_rate: number;
+    done_today: number;
   };
+};
+
+export type UpdateHospitalInput = {
+  hospital_name?: string;
+  address?: string | null;
+  unit_donor?: string | null;
+  pic_name?: string | null;
+  contact?: string | null;
+  hospital_type?: string | null;
 };
 
 export async function getMyHospital() {
   const { data } = await api.get<FacilityProfile>("/hospitals/me");
+
+  return data;
+}
+
+export async function updateMyHospital(input: UpdateHospitalInput) {
+  const { data } = await api.patch<FacilityProfile>("/hospitals/me", input);
 
   return data;
 }
