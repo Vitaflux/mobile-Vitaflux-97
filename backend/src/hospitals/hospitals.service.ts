@@ -8,6 +8,7 @@ import { ObjectId } from 'mongodb';
 import { Blood } from '../bloods/entities/blood.model';
 import { Request } from '../requests/entities/request.model';
 import { Hospital } from './entities/hospital.model';
+import { UpdateHospitalProfileDto } from './dto/update-hospital-profile.dto';
 
 @Injectable()
 export class HospitalsService {
@@ -21,6 +22,61 @@ export class HospitalsService {
     @InjectModel(Request)
     private readonly requestModel: Request,
   ) {}
+
+  async updateForFacility(
+    userId: string,
+    updateHospitalProfileDto: UpdateHospitalProfileDto,
+  ) {
+    if (!ObjectId.isValid(userId)) {
+      throw new UnauthorizedException('Invalid authenticated user');
+    }
+
+    const userObjectId = new ObjectId(userId);
+
+    const existingHospital = await this.hospitalModel
+      .where('user_id', userObjectId)
+      .first();
+
+    const hospitalData = {
+      hospital_name: updateHospitalProfileDto.hospital_name,
+      address: updateHospitalProfileDto.address,
+      location: {
+        type: updateHospitalProfileDto.location.type,
+        coordinates: updateHospitalProfileDto.location.coordinates,
+      },
+      unit_donor:
+        updateHospitalProfileDto.unit_donor !== undefined
+          ? updateHospitalProfileDto.unit_donor
+          : (existingHospital?.unit_donor ?? null),
+      pic_name:
+        updateHospitalProfileDto.pic_name !== undefined
+          ? updateHospitalProfileDto.pic_name
+          : (existingHospital?.pic_name ?? null),
+      contact:
+        updateHospitalProfileDto.contact !== undefined
+          ? updateHospitalProfileDto.contact
+          : (existingHospital?.contact ?? null),
+      hospital_type:
+        updateHospitalProfileDto.hospital_type !== undefined
+          ? updateHospitalProfileDto.hospital_type
+          : (existingHospital?.hospital_type ?? null),
+    };
+
+    if (existingHospital) {
+      await this.hospitalModel
+        .where('_id', existingHospital._id)
+        .update(hospitalData);
+    } else {
+      await this.hospitalModel.insert({
+        user_id: userObjectId,
+        ...hospitalData,
+        code: null,
+        isVerified: false,
+      });
+    }
+
+    return this.getForFacility(userId);
+  }
 
   async getForFacility(userId: string) {
     if (!ObjectId.isValid(userId)) {

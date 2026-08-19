@@ -85,7 +85,7 @@ export default function Applicants() {
   });
 
   const blood = bloodQuery.data as BloodContext | undefined;
-  const applicants = (applicantQuery.data ?? []) as Applicant[];
+  const applicants = (applicantQuery.data ?? []) as unknown as Applicant[];
 
   const filteredApplicants =
     filter === "all"

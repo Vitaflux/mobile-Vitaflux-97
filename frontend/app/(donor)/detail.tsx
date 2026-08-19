@@ -248,7 +248,7 @@ export default function BloodDetail() {
         `&query=${latitude},${longitude}`;
     } else {
       const query = encodeURIComponent(
-        `${hospitalName} ${detail.hospital?.address ?? ""}`,
+        `${hospitalName} ${detail?.hospital?.address ?? ""}`,
       );
 
       url = "https://www.google.com/maps/search/?api=1" + `&query=${query}`;
