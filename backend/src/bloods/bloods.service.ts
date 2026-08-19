@@ -332,20 +332,12 @@ export class BloodsService implements OnModuleInit {
       };
     }
 
-    const hospitalCollection = this.hospitalModel
-      .query()
-      .getMongoDBCollection();
-
-    const nearbyHospitals = await hospitalCollection
-      .find({
-        location: {
-          $near: {
-            $geometry: profile.location,
-            $maxDistance: radius,
-          },
-        },
-      })
-      .toArray();
+    const nearbyHospitals = await this.hospitalModel.where('location', {
+      $near: {
+        $geometry: profile.location,
+        $maxDistance: radius,
+      },
+    }).get()
 
     if (nearbyHospitals.length === 0) {
       return {
