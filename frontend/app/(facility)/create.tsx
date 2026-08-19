@@ -173,8 +173,10 @@ export default function CreateBlood() {
         rhesus,
         quantity: qty,
         component,
-        schedule: `${selectedDate}T${selectedStartTime}:00`,
-        schedule_end: `${selectedDate}T${selectedEndTime}:00`,
+        // Kirim instant lengkap dengan zona waktu agar backend tidak
+        // menafsirkan jam lokal sebagai UTC atau zona waktu server.
+        schedule: schedule!.toISOString(),
+        schedule_end: scheduleEnd!.toISOString(),
         note: note.trim() || null,
         status_blood: urgent ? "urgent" : "normal",
       });

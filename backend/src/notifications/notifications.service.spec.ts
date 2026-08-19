@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import type { ExpoPushMessage } from 'expo-server-sdk';
+import { ObjectId } from 'mongodb';
 import { UserProfile } from '../profiles/entities/user-profile.model';
 import { NotificationsService } from './notifications.service';
 
@@ -33,6 +34,9 @@ describe('NotificationsService', () => {
   const userProfileModel = {
     query: jest.fn(() => ({
       getMongoDBCollection: jest.fn(() => collection),
+    })),
+    where: jest.fn(() => ({
+      first: jest.fn().mockResolvedValue({ push_token: validPushToken }),
     })),
   };
 
@@ -94,37 +98,24 @@ describe('NotificationsService', () => {
     expect(result.matched_donors).toBe(1);
   });
 
-  it('sends eligibility reminders only to donors at H-3', async () => {
-    toArray.mockResolvedValue([
-      {
-        push_token: validPushToken,
-        last_donor: new Date('2026-05-23T00:00:00.000Z'),
-      },
-      {
-        push_token: 'invalid-token',
-        last_donor: new Date('2026-05-23T00:00:00.000Z'),
-      },
-      {
-        push_token: 'ExponentPushToken[yyyyyyyyyyyyyyyyyyyyyy]',
-        last_donor: new Date('2026-05-22T00:00:00.000Z'),
-      },
-    ]);
+  it('notifies the donor when a facility confirms the registration', async () => {
+    const result = await service.sendDonorConfirmationNotification({
+      userProfileId: new ObjectId(),
+      hospitalName: 'RS Vitaflux',
+      schedule: new Date('2026-08-21T02:00:00.000Z'),
+    });
 
-    const result = await service.sendEligibilityReminderNotifications(
-      new Date('2026-08-18T00:00:00.000Z'),
-    );
-
-    expect(mockChunkPushNotifications).toHaveBeenCalledWith([
+    expect(mockSendPushNotificationsAsync).toHaveBeenCalledWith([
       expect.objectContaining({
         to: validPushToken,
-        body: '3 hari lagi kamu sudah boleh donor kembali',
-        data: {
-          type: 'donor_eligibility_reminder',
-          eligible_at: '2026-08-21T00:00:00.000Z',
-        },
+        title: 'Pendaftaran donor dikonfirmasi',
+        data: expect.objectContaining({
+          type: 'donor_request_confirmed',
+          schedule: '2026-08-21T02:00:00.000Z',
+        }),
       }),
     ]);
     expect(mockSendPushNotificationsAsync).toHaveBeenCalledTimes(1);
-    expect(result.reminded_donors).toBe(1);
+    expect(result.sent).toBe(true);
   });
 });

@@ -64,11 +64,13 @@ export default function Status() {
 
   const requests = (q.data ?? []) as Req[];
 
+  // ObjectId MongoDB berurutan berdasarkan waktu pembuatan. Tampilkan
+  // pendaftaran terbaru agar status lama tidak menutupi hasil konfirmasi
+  // atau check-in yang baru saja dilakukan.
   const req =
-    requests.find((item) => item.status === "confirmed") ??
-    requests.find((item) => item.status === "registered") ??
-    requests[0] ??
-    null;
+    [...requests].sort((first, second) =>
+      second.id.localeCompare(first.id),
+    )[0] ?? null;
 
   if (q.isLoading) {
     return (

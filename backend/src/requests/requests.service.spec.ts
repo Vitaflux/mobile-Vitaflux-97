@@ -6,8 +6,13 @@ import { UserProfile } from '../profiles/entities/user-profile.model';
 import { User } from '../users/entities/user.model';
 import { Request } from './entities/request.model';
 import { RequestsService } from './requests.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
-describe('RequestsService check-in schedule validation', () => {
+jest.mock('../notifications/notifications.service', () => ({
+  NotificationsService: class NotificationsService {},
+}));
+
+describe('RequestsService check-in flow', () => {
   const now = new Date('2026-08-18T08:00:00.000Z');
   const userId = new ObjectId();
   const hospitalId = new ObjectId();
@@ -72,6 +77,9 @@ describe('RequestsService check-in schedule validation', () => {
       {} as UserProfile,
       hospitalModel as unknown as Hospital,
       {} as User,
+      {
+        sendDonorConfirmationNotification: jest.fn(),
+      } as unknown as NotificationsService,
     );
 
     return { service, update, requestModel };
@@ -86,34 +94,44 @@ describe('RequestsService check-in schedule validation', () => {
     jest.useRealTimers();
   });
 
-  it('rejects check-in before the donation schedule starts', async () => {
+  it('allows a confirmed donor to check in before the planned start time', async () => {
     const { service, update } = createService(
       new Date('2026-08-18T09:00:00.000Z'),
       new Date('2026-08-18T15:00:00.000Z'),
     );
 
-    await expect(
-      service.checkInForFacility(userId.toString(), qrToken, 350),
-    ).rejects.toThrow(
-      new BadRequestException(
-        'QR cannot be used because the donation schedule has not started',
-      ),
+    const result = await service.checkInForFacility(
+      userId.toString(),
+      qrToken,
+      350,
     );
 
-    expect(update).not.toHaveBeenCalled();
+    expect(result.data.status).toBe('done');
+    expect(update).toHaveBeenCalledWith({
+      status: 'done',
+      checked_in_at: now,
+      volume_ml: 350,
+    });
   });
 
-  it('rejects check-in after the donation schedule ends', async () => {
+  it('allows a confirmed donor to finish after the planned end time', async () => {
     const { service, update } = createService(
       new Date('2026-08-18T01:00:00.000Z'),
       new Date('2026-08-18T07:00:00.000Z'),
     );
 
-    await expect(
-      service.checkInForFacility(userId.toString(), qrToken, 350),
-    ).rejects.toThrow(new BadRequestException('QR/schedule has expired'));
+    const result = await service.checkInForFacility(
+      userId.toString(),
+      qrToken,
+      350,
+    );
 
-    expect(update).not.toHaveBeenCalled();
+    expect(result.data.status).toBe('done');
+    expect(update).toHaveBeenCalledWith({
+      status: 'done',
+      checked_in_at: now,
+      volume_ml: 350,
+    });
   });
 
   it('completes check-in during the active donation schedule', async () => {
