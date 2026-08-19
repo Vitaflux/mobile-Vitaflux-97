@@ -7,7 +7,6 @@ export interface IUser extends IMongoloquentSchema {
   name: string;
   email: string;
   password: string;
-  google_sub?: string;
   role: UserRole;
   created_at: Date;
 }
