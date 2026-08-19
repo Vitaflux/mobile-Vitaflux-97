@@ -5,24 +5,104 @@ import {
   ActivityIndicator,
   RefreshControl,
   Pressable,
+  Alert,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, LogOut, MapPin, ShieldCheck } from "lucide-react-native";
-import { getMyHospital } from "../../src/api/hospitals";
+import { getMyHospital, updateMyHospital } from "../../src/api/hospitals";
 import { useAuth } from "../../src/store/auth";
+import { useState } from "react";
+import * as Location from "expo-location";
+import { errorMessage } from "../../src/lib/errorMessage";
 
 export default function FacilityProfile() {
   const logout = useAuth((state) => state.logout);
+
+  const queryClient = useQueryClient();
+
+  const [hospitalName, setHospitalName] = useState("");
+  const [address, setAddress] = useState("");
+  const [unitDonor, setUnitDonor] = useState("");
+  const [picName, setPicName] = useState("");
+  const [contact, setContact] = useState("");
+  const [hospitalType, setHospitalType] = useState("");
+  const [locating, setLocating] = useState(false);
 
   const q = useQuery({
     queryKey: ["my-hospital"],
     queryFn: () => getMyHospital(),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: updateMyHospital,
+  });
+
   const hospital = q.data;
+
+  const needsSetup =
+    (q.error as { response?: { status?: number } } | null)?.response?.status ===
+    404;
+
+  async function onSetupHospital() {
+    if (!hospitalName.trim() || !address.trim()) {
+      Alert.alert("Lengkapi profil", "Nama dan alamat fasilitas wajib diisi.");
+      return;
+    }
+
+    setLocating(true);
+
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== "granted") {
+        Alert.alert(
+          "Izin lokasi diperlukan",
+          "Aktifkan izin lokasi agar kebutuhan darah dapat ditemukan donor di sekitar fasilitas.",
+        );
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      await updateMutation.mutateAsync({
+        hospital_name: hospitalName.trim(),
+        address: address.trim(),
+        location: {
+          type: "Point",
+          coordinates: [
+            currentLocation.coords.longitude,
+            currentLocation.coords.latitude,
+          ],
+        },
+        unit_donor: unitDonor.trim() || null,
+        pic_name: picName.trim() || null,
+        contact: contact.trim() || null,
+        hospital_type: hospitalType.trim() || null,
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["my-hospital"],
+      });
+
+      Alert.alert(
+        "Profil tersimpan",
+        "Sekarang kamu dapat menerbitkan kebutuhan darah.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Gagal menyimpan profil",
+        errorMessage(error, "Periksa data atau koneksi backend."),
+      );
+    } finally {
+      setLocating(false);
+    }
+  }
 
   async function onLogout() {
     await logout();
@@ -60,24 +140,107 @@ export default function FacilityProfile() {
               </Text>
             </View>
           ) : q.isError ? (
-            <View className="p-5 mt-6 border rounded-card border-line bg-surface">
-              <Text className="font-archivo-bold text-body text-ink">
-                Profil belum dapat dimuat
-              </Text>
-
-              <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                Periksa koneksi lalu coba lagi.
-              </Text>
-
-              <Pressable
-                onPress={() => q.refetch()}
-                className="items-center py-3 mt-4 rounded-pill bg-primary active:bg-primary-dark"
-              >
-                <Text className="text-white font-archivo-bold text-body">
-                  Coba lagi
+            needsSetup ? (
+              <View className="p-5 mt-6 border rounded-card border-line bg-surface">
+                <Text className="font-archivo-bold text-subjudul text-ink">
+                  Lengkapi profil faskes
                 </Text>
-              </Pressable>
-            </View>
+
+                <Text className="mt-2 mb-5 font-archivo text-caption text-ink-muted">
+                  Profil dan lokasi diperlukan agar kebutuhan darah dapat
+                  ditemukan oleh donor di sekitar fasilitas.
+                </Text>
+
+                <SetupField
+                  label="Nama fasilitas *"
+                  value={hospitalName}
+                  onChangeText={setHospitalName}
+                  placeholder="Contoh: RS Zaya"
+                />
+
+                <SetupField
+                  label="Alamat *"
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Alamat lengkap fasilitas"
+                />
+
+                <SetupField
+                  label="Unit donor"
+                  value={unitDonor}
+                  onChangeText={setUnitDonor}
+                  placeholder="Contoh: Unit Donor Darah"
+                />
+
+                <SetupField
+                  label="Penanggung jawab"
+                  value={picName}
+                  onChangeText={setPicName}
+                  placeholder="Nama penanggung jawab"
+                />
+
+                <SetupField
+                  label="Kontak"
+                  value={contact}
+                  onChangeText={setContact}
+                  placeholder="Nomor telepon fasilitas"
+                />
+
+                <SetupField
+                  label="Jenis fasilitas"
+                  value={hospitalType}
+                  onChangeText={setHospitalType}
+                  placeholder="Contoh: Rumah Sakit"
+                />
+
+                <Text className="font-archivo text-caption text-ink-muted">
+                  Saat disimpan, aplikasi akan memakai lokasi perangkat ini
+                  sebagai titik fasilitas.
+                </Text>
+
+                <Pressable
+                  onPress={onSetupHospital}
+                  disabled={locating || updateMutation.isPending}
+                  className="items-center py-4 mt-5 rounded-pill bg-primary active:bg-primary-dark"
+                >
+                  {locating || updateMutation.isPending ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-white font-archivo-bold text-body">
+                      Simpan profil faskes
+                    </Text>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  onPress={onLogout}
+                  className="items-center py-3 mt-3 border rounded-pill border-primary active:bg-primary-soft"
+                >
+                  <Text className="font-archivo-bold text-body text-primary-dark">
+                    Keluar
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View className="p-5 mt-6 border rounded-card border-line bg-surface">
+                <Text className="font-archivo-bold text-body text-ink">
+                  Profil belum dapat dimuat
+                </Text>
+
+                <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                  Periksa koneksi lalu coba lagi.
+                </Text>
+
+                <Pressable
+                  onPress={() => q.refetch()}
+                  className="items-center py-3 mt-4 rounded-pill bg-primary active:bg-primary-dark"
+                >
+                  <Text className="text-white font-archivo-bold text-body">
+                    Coba lagi
+                  </Text>
+                </Pressable>
+              </View>
+            )
           ) : hospital ? (
             <>
               {/* Header profil */}
@@ -198,6 +361,34 @@ function InfoRow({
       <Text className="mt-1 font-archivo-semibold text-body text-ink">
         {value || "-"}
       </Text>
+    </View>
+  );
+}
+
+function SetupField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <View className="mb-4">
+      <Text className="mb-2 font-archivo-medium text-caption text-ink">
+        {label}
+      </Text>
+
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#9B9797"
+        className="px-4 py-3 border rounded-card border-line bg-surface font-archivo text-body text-ink"
+      />
     </View>
   );
 }
