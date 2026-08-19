@@ -39,6 +39,7 @@ type CheckInResult = {
   status: "done";
   code?: string | null;
   checked_in_at?: string | null;
+  volume_ml?: number | null;
 };
 
 export default function Scan() {
@@ -54,6 +55,8 @@ export default function Scan() {
   const [scannerLocked, setScannerLocked] = useState(false);
 
   const [manualCode, setManualCode] = useState("");
+
+  const [volumeMl, setVolumeMl] = useState("");
 
   const [pendingInput, setPendingInput] = useState<InputMethod | null>(null);
 
@@ -106,6 +109,19 @@ export default function Scan() {
       return;
     }
 
+    const parsedVolume = Number(volumeMl);
+
+    if (
+      !Number.isInteger(parsedVolume) ||
+      parsedVolume < 1 ||
+      parsedVolume > 2000
+    ) {
+      setFailureTitle("Volume belum sesuai");
+      setFailureMessage("Masukkan volume darah antara 1–2000 ml.");
+      setScreen("error");
+      return;
+    }
+
     setProcessing(true);
 
     try {
@@ -113,9 +129,11 @@ export default function Scan() {
         pendingInput.type === "qr"
           ? await checkInRequest({
               qr_token: pendingInput.value,
+              volume_ml: parsedVolume,
             })
           : await checkInRequest({
               code: pendingInput.value,
+              volume_ml: parsedVolume,
             });
 
       setResult(response as unknown as CheckInResult);
@@ -183,6 +201,7 @@ export default function Scan() {
     setTorchEnabled(false);
     setScannerLocked(false);
     setManualCode("");
+    setVolumeMl("");
     setPendingInput(null);
     setResult(null);
     setFailureTitle("Check-in gagal");
@@ -193,6 +212,8 @@ export default function Scan() {
     return (
       <ConfirmationScreen
         pendingInput={pendingInput}
+        volumeMl={volumeMl}
+        onVolumeChange={setVolumeMl}
         processing={processing}
         onConfirm={onConfirmCheckIn}
         onCancel={resetScanner}
@@ -438,11 +459,15 @@ function ManualCodeScreen({
 
 function ConfirmationScreen({
   pendingInput,
+  volumeMl,
+  onVolumeChange,
   processing,
   onConfirm,
   onCancel,
 }: {
   pendingInput: InputMethod | null;
+  volumeMl: string;
+  onVolumeChange: (value: string) => void;
   processing: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -451,6 +476,9 @@ function ConfirmationScreen({
     pendingInput?.type === "code"
       ? pendingInput.value
       : "QR pendonor berhasil dibaca";
+  const parsedVolume = Number(volumeMl);
+  const volumeValid =
+    Number.isInteger(parsedVolume) && parsedVolume >= 1 && parsedVolume <= 2000;
 
   return (
     <View className="flex-1 bg-ground">
@@ -477,12 +505,48 @@ function ConfirmationScreen({
           <Text className="mt-1 font-archivo text-caption text-ink-muted">
             Setelah dikonfirmasi, status donor akan berubah menjadi Selesai.
           </Text>
+
+          <Text className="mt-5 font-archivo-semibold text-caption text-ink">
+            Volume darah (ml)
+          </Text>
+
+          <TextInput
+            value={volumeMl}
+            onChangeText={(value) =>
+              onVolumeChange(value.replace(/[^0-9]/g, ""))
+            }
+            placeholder="Contoh: 350"
+            placeholderTextColor="#9B9797"
+            keyboardType="number-pad"
+            maxLength={4}
+            className="px-4 py-4 mt-2 border rounded-card border-line bg-ground font-archivo-bold text-body text-ink"
+          />
+
+          <View className="flex-row mt-3 gap-x-2">
+            {[250, 350, 450].map((amount) => (
+              <Pressable
+                key={amount}
+                onPress={() => onVolumeChange(String(amount))}
+                className={`flex-1 items-center rounded-pill border py-2 ${
+                  volumeMl === String(amount)
+                    ? "border-primary bg-primary-soft"
+                    : "border-line bg-surface"
+                }`}
+              >
+                <Text className="font-archivo-semibold text-caption text-ink">
+                  {amount} ml
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
 
         <Pressable
           onPress={onConfirm}
-          disabled={processing}
-          className="items-center w-full py-4 mt-6 rounded-pill bg-primary active:bg-primary-dark"
+          disabled={processing || !volumeValid}
+          className={`items-center w-full py-4 mt-6 rounded-pill ${
+            volumeValid ? "bg-primary active:bg-primary-dark" : "bg-primary/50"
+          }`}
         >
           {processing ? (
             <ActivityIndicator color="#FFFFFF" />
@@ -535,6 +599,11 @@ function SuccessScreen({
           <InfoRow label="Status" value="Selesai" />
 
           <InfoRow label="Kode" value={result?.code || "-"} />
+
+          <InfoRow
+            label="Volume"
+            value={result?.volume_ml ? `${result.volume_ml} ml` : "-"}
+          />
 
           <InfoRow
             label="Waktu check-in"
