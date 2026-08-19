@@ -17,6 +17,7 @@ import { getMyHospital, updateMyHospital } from "../../src/api/hospitals";
 import { useAuth } from "../../src/store/auth";
 import { useState } from "react";
 import * as Location from "expo-location";
+import MapView, { Marker } from "react-native-maps";
 import { errorMessage } from "../../src/lib/errorMessage";
 
 export default function FacilityProfile() {
@@ -30,6 +31,9 @@ export default function FacilityProfile() {
   const [picName, setPicName] = useState("");
   const [contact, setContact] = useState("");
   const [hospitalType, setHospitalType] = useState("");
+  const [facilityCoordinates, setFacilityCoordinates] = useState<
+    [number, number] | null
+  >(null);
   const [locating, setLocating] = useState(false);
 
   const q = useQuery({
@@ -48,37 +52,21 @@ export default function FacilityProfile() {
     404;
 
   async function onSetupHospital() {
-    if (!hospitalName.trim() || !address.trim()) {
-      Alert.alert("Lengkapi profil", "Nama dan alamat fasilitas wajib diisi.");
+    if (!hospitalName.trim() || !address.trim() || !facilityCoordinates) {
+      Alert.alert(
+        "Lengkapi profil",
+        "Nama, alamat, dan lokasi fasilitas wajib diisi.",
+      );
       return;
     }
 
-    setLocating(true);
-
     try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-
-      if (permission.status !== "granted") {
-        Alert.alert(
-          "Izin lokasi diperlukan",
-          "Aktifkan izin lokasi agar kebutuhan darah dapat ditemukan donor di sekitar fasilitas.",
-        );
-        return;
-      }
-
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
       await updateMutation.mutateAsync({
         hospital_name: hospitalName.trim(),
         address: address.trim(),
         location: {
           type: "Point",
-          coordinates: [
-            currentLocation.coords.longitude,
-            currentLocation.coords.latitude,
-          ],
+          coordinates: facilityCoordinates,
         },
         unit_donor: unitDonor.trim() || null,
         pic_name: picName.trim() || null,
@@ -98,6 +86,92 @@ export default function FacilityProfile() {
       Alert.alert(
         "Gagal menyimpan profil",
         errorMessage(error, "Periksa data atau koneksi backend."),
+      );
+    }
+  }
+
+  async function onSelectSetupLocation() {
+    setLocating(true);
+
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== "granted") {
+        Alert.alert(
+          "Izin lokasi diperlukan",
+          "Aktifkan izin lokasi untuk menentukan titik fasilitas.",
+        );
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      setFacilityCoordinates([
+        currentLocation.coords.longitude,
+        currentLocation.coords.latitude,
+      ]);
+    } catch (error) {
+      Alert.alert(
+        "Gagal mengambil lokasi",
+        errorMessage(error, "Periksa izin lokasi perangkat."),
+      );
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  async function onUpdateLocation() {
+    if (!hospital) {
+      return;
+    }
+
+    setLocating(true);
+
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== "granted") {
+        Alert.alert(
+          "Izin lokasi diperlukan",
+          "Aktifkan izin lokasi agar posisi fasilitas dapat diperbarui.",
+        );
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      await updateMutation.mutateAsync({
+        hospital_name: hospital.hospital_name,
+        address: hospital.address ?? "",
+        location: {
+          type: "Point",
+          coordinates: [
+            currentLocation.coords.longitude,
+            currentLocation.coords.latitude,
+          ],
+        },
+        unit_donor: hospital.unit_donor,
+        pic_name: hospital.pic_name,
+        contact: hospital.contact,
+        hospital_type: hospital.hospital_type,
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["my-hospital"],
+      });
+
+      Alert.alert(
+        "Lokasi diperbarui",
+        "Titik fasilitas sekarang mengikuti lokasi perangkat ini.",
+      );
+    } catch (error) {
+      Alert.alert(
+        "Gagal memperbarui lokasi",
+        errorMessage(error, "Periksa izin lokasi atau koneksi backend."),
       );
     } finally {
       setLocating(false);
@@ -165,6 +239,74 @@ export default function FacilityProfile() {
                   placeholder="Alamat lengkap fasilitas"
                 />
 
+                <Text className="mb-2 font-archivo-medium text-caption text-ink">
+                  Lokasi fasilitas *
+                </Text>
+
+                <Pressable
+                  onPress={onSelectSetupLocation}
+                  disabled={locating}
+                  className="flex-row items-center justify-center py-3 mb-4 border rounded-pill border-primary active:bg-primary-soft"
+                >
+                  {locating ? (
+                    <ActivityIndicator color="#A31B0A" />
+                  ) : (
+                    <>
+                      <MapPin color="#A31B0A" size={18} />
+
+                      <Text className="ml-2 font-archivo-bold text-body text-primary-dark">
+                        {facilityCoordinates
+                          ? "Gunakan ulang lokasi perangkat"
+                          : "Gunakan lokasi perangkat"}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+
+                {facilityCoordinates ? (
+                  <View className="mb-5 overflow-hidden border rounded-[18px] border-line">
+                    <MapView
+                      key={facilityCoordinates.join(",")}
+                      style={{ width: "100%", height: 220 }}
+                      initialRegion={{
+                        latitude: facilityCoordinates[1],
+                        longitude: facilityCoordinates[0],
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                      }}
+                      onPress={(event) =>
+                        setFacilityCoordinates([
+                          event.nativeEvent.coordinate.longitude,
+                          event.nativeEvent.coordinate.latitude,
+                        ])
+                      }
+                    >
+                      <Marker
+                        draggable
+                        coordinate={{
+                          latitude: facilityCoordinates[1],
+                          longitude: facilityCoordinates[0],
+                        }}
+                        onDragEnd={(event) =>
+                          setFacilityCoordinates([
+                            event.nativeEvent.coordinate.longitude,
+                            event.nativeEvent.coordinate.latitude,
+                          ])
+                        }
+                      />
+                    </MapView>
+
+                    <Text className="px-4 py-3 font-archivo text-caption text-ink-muted bg-surface">
+                      Ketuk peta atau geser pin untuk menyesuaikan titik.
+                    </Text>
+                  </View>
+                ) : (
+                  <Text className="mb-5 font-archivo text-caption text-ink-muted">
+                    Pilih lokasi agar fasilitas dapat ditemukan donor di dalam
+                    radius.
+                  </Text>
+                )}
+
                 <SetupField
                   label="Unit donor"
                   value={unitDonor}
@@ -192,11 +334,6 @@ export default function FacilityProfile() {
                   onChangeText={setHospitalType}
                   placeholder="Contoh: Rumah Sakit"
                 />
-
-                <Text className="font-archivo text-caption text-ink-muted">
-                  Saat disimpan, aplikasi akan memakai lokasi perangkat ini
-                  sebagai titik fasilitas.
-                </Text>
 
                 <Pressable
                   onPress={onSetupHospital}
@@ -282,6 +419,24 @@ export default function FacilityProfile() {
                     </Text>
                   </View>
                 ) : null}
+
+                <Pressable
+                  onPress={onUpdateLocation}
+                  disabled={locating || updateMutation.isPending}
+                  className="flex-row items-center justify-center py-3 mt-4 border rounded-pill border-primary active:bg-primary-soft"
+                >
+                  {locating || updateMutation.isPending ? (
+                    <ActivityIndicator color="#A31B0A" />
+                  ) : (
+                    <>
+                      <MapPin color="#A31B0A" size={18} />
+
+                      <Text className="ml-2 font-archivo-bold text-body text-primary-dark">
+                        Perbarui lokasi fasilitas
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
               </View>
 
               {/* Data fasilitas */}
