@@ -3,7 +3,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import { MapPin, Navigation } from "lucide-react-native";
-import MapView, { Marker } from "react-native-maps";
 import { useQuery } from "@tanstack/react-query";
 import { getMyProfile } from "../../src/api/profiles";
 
@@ -94,7 +93,9 @@ function formatSchedule(startValue: string, endValue?: string | null) {
 }
 
 function parseDetail(value?: string): Detail | null {
-  if (!value) return null;
+  if (!value) {
+    return null;
+  }
 
   try {
     return JSON.parse(value) as Detail;
@@ -110,7 +111,6 @@ function calculateDistanceKm(from: [number, number], to: [number, number]) {
   const toRadians = (value: number) => (value * Math.PI) / 180;
 
   const latitudeDifference = toRadians(toLatitude - fromLatitude);
-
   const longitudeDifference = toRadians(toLongitude - fromLongitude);
 
   const firstLatitude = toRadians(fromLatitude);
@@ -132,7 +132,6 @@ function estimateTravelTime(distanceKm?: number | null) {
     return null;
   }
 
-  // Estimasi kendaraan dengan kecepatan rata-rata 25 km/jam.
   const minutes = Math.max(5, Math.round((distanceKm / 25) * 60));
 
   if (minutes < 60) {
@@ -183,20 +182,24 @@ export default function BloodDetail() {
 
   const hospitalName = detail.hospital?.hospital_name ?? "Fasilitas kesehatan";
 
+  const hospitalAddress =
+    detail.hospital?.address ?? "Alamat faskes belum tersedia";
+
   const coordinates = detail.hospital?.location?.coordinates;
 
   const longitude = coordinates?.[0];
-
   const latitude = coordinates?.[1];
 
   const hasCoordinates =
-    typeof latitude === "number" && typeof longitude === "number";
+    typeof latitude === "number" &&
+    Number.isFinite(latitude) &&
+    typeof longitude === "number" &&
+    Number.isFinite(longitude);
 
   const donorCoordinates = profileQuery.data?.location?.coordinates;
 
   const calculatedDistance =
-    typeof latitude === "number" &&
-    typeof longitude === "number" &&
+    hasCoordinates &&
     Array.isArray(donorCoordinates) &&
     donorCoordinates.length === 2
       ? calculateDistanceKm(donorCoordinates as [number, number], [
@@ -206,7 +209,7 @@ export default function BloodDetail() {
       : null;
 
   const displayedDistanceKm =
-    typeof detail.distanceKm === "number"
+    typeof detail.distanceKm === "number" && Number.isFinite(detail.distanceKm)
       ? detail.distanceKm
       : calculatedDistance;
 
@@ -237,13 +240,19 @@ export default function BloodDetail() {
   }
 
   async function openMaps() {
-    if (!hasCoordinates) {
-      return;
-    }
+    let url: string;
 
-    const url =
-      `https://www.google.com/maps/search/?api=1` +
-      `&query=${latitude},${longitude}`;
+    if (hasCoordinates) {
+      url =
+        "https://www.google.com/maps/search/?api=1" +
+        `&query=${latitude},${longitude}`;
+    } else {
+      const query = encodeURIComponent(
+        `${hospitalName} ${detail.hospital?.address ?? ""}`,
+      );
+
+      url = "https://www.google.com/maps/search/?api=1" + `&query=${query}`;
+    }
 
     await Linking.openURL(url);
   }
@@ -299,7 +308,7 @@ export default function BloodDetail() {
           </Text>
 
           <Text className="mt-2 font-archivo-bold text-body text-ink">
-            {detail.hospital?.hospital_name ?? "Fasilitas kesehatan"}
+            {hospitalName}
           </Text>
 
           {detail.hospital?.address ? (
@@ -372,57 +381,46 @@ export default function BloodDetail() {
             </View>
           ) : null}
 
-          {/* Map */}
+          {/* Facility location */}
           <Text className="mb-3 mt-7 font-archivo-bold text-overline tracking-overline text-ink-muted">
             LOKASI FASKES
           </Text>
 
-          {hasCoordinates ? (
-            <>
-              <View className="h-48 overflow-hidden rounded-[18px] border border-line bg-surface">
-                <MapView
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                  }}
-                  initialRegion={{
-                    latitude,
-                    longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }}
-                >
-                  <Marker
-                    coordinate={{
-                      latitude,
-                      longitude,
-                    }}
-                    title={detail.hospital?.hospital_name}
-                    description={detail.hospital?.address ?? undefined}
-                  />
-                </MapView>
+          <View className="rounded-[18px] border border-line bg-surface p-5">
+            <View className="flex-row items-start">
+              <View className="items-center justify-center w-12 h-12 mr-4 rounded-card bg-primary-soft">
+                <MapPin color="#A31B0A" size={24} />
               </View>
 
-              <Pressable
-                onPress={openMaps}
-                className="flex-row items-center justify-center py-3 mt-3 border rounded-pill border-line bg-surface active:bg-ground"
-              >
-                <Navigation color="#A31B0A" size={18} />
-
-                <Text className="ml-2 font-archivo-bold text-body text-primary-dark">
-                  Buka di Google Maps
+              <View className="flex-1">
+                <Text className="font-archivo-bold text-body text-ink">
+                  {hospitalName}
                 </Text>
-              </Pressable>
-            </>
-          ) : (
-            <View className="items-center justify-center h-36 rounded-[18px] border border-line bg-surface">
-              <MapPin color="#605D5D" size={28} />
 
-              <Text className="mt-2 font-archivo text-caption text-ink-muted">
-                Koordinat faskes belum tersedia.
-              </Text>
+                <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                  {hospitalAddress}
+                </Text>
+
+                {typeof displayedDistanceKm === "number" ? (
+                  <Text className="mt-2 font-archivo-semibold text-caption text-primary-dark">
+                    {displayedDistanceKm.toFixed(1)} km
+                    {travelTime ? ` · ETA ${travelTime}` : ""}
+                  </Text>
+                ) : null}
+              </View>
             </View>
-          )}
+
+            <Pressable
+              onPress={openMaps}
+              className="flex-row items-center justify-center py-3 mt-4 border rounded-pill border-primary active:bg-primary-soft"
+            >
+              <Navigation color="#A31B0A" size={18} />
+
+              <Text className="ml-2 font-archivo-bold text-body text-primary-dark">
+                Buka di Google Maps
+              </Text>
+            </Pressable>
+          </View>
 
           {/* Facility note */}
           {detail.note ? (
