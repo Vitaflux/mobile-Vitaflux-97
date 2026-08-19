@@ -6,6 +6,13 @@ export interface RegisterInput {
   email: string;
   password: string;
   role: Role;
+  location: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+  blood_type?: "A" | "B" | "AB" | "O";
+  rhesus?: "+" | "-";
+  address?: string;
 }
 
 export interface LoginResult {

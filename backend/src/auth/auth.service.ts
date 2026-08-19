@@ -7,6 +7,8 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@mongoloquent/nestjs';
 import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.model';
+import { Hospital } from '../hospitals/entities/hospital.model';
+import { UserProfile } from '../profiles/entities/user-profile.model';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
 
@@ -15,6 +17,10 @@ export class AuthService {
   constructor(
     @InjectModel(User)
     private readonly userModel: User,
+    @InjectModel(UserProfile)
+    private readonly userProfileModel: UserProfile,
+    @InjectModel(Hospital)
+    private readonly hospitalModel: Hospital,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -38,6 +44,34 @@ export class AuthService {
       role: registerDto.role,
       created_at: createdAt,
     });
+
+    if (registerDto.role === 'donor') {
+      await this.userProfileModel.insert({
+        user_id: user._id,
+        blood_type: registerDto.blood_type!,
+        rhesus: registerDto.rhesus!,
+        location: registerDto.location,
+        last_donor: null,
+        push_token: null,
+        birth_date: null,
+        weight_kg: null,
+        city: null,
+        notify_radius_km: 10,
+      });
+    } else {
+      await this.hospitalModel.insert({
+        user_id: user._id,
+        hospital_name: registerDto.name.trim(),
+        address: registerDto.address!.trim(),
+        location: registerDto.location,
+        isVerified: false,
+        code: null,
+        unit_donor: null,
+        pic_name: null,
+        contact: null,
+        hospital_type: null,
+      });
+    }
 
     return {
       success: true,

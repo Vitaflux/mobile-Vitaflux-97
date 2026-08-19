@@ -1,12 +1,17 @@
 import {
+  IsDefined,
   IsEmail,
   IsIn,
   IsNotEmpty,
   IsString,
   MinLength,
+  ValidateIf,
+  ValidateNested,
 } from 'class-validator';
-import { USER_ROLES } from '../../common/constants';
-import type { UserRole } from '../../common/constants';
+import { Type } from 'class-transformer';
+import { BLOOD_TYPES, RHESUS_TYPES, USER_ROLES } from '../../common/constants';
+import type { BloodType, RhesusType, UserRole } from '../../common/constants';
+import { GeoPointDto } from '../../profiles/dto/geo-point.dto';
 
 export class RegisterDto {
   @IsString()
@@ -22,4 +27,22 @@ export class RegisterDto {
 
   @IsIn(USER_ROLES)
   role!: UserRole;
+
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => GeoPointDto)
+  location!: GeoPointDto;
+
+  @ValidateIf((value: RegisterDto) => value.role === 'donor')
+  @IsIn(BLOOD_TYPES)
+  blood_type?: BloodType;
+
+  @ValidateIf((value: RegisterDto) => value.role === 'donor')
+  @IsIn(RHESUS_TYPES)
+  rhesus?: RhesusType;
+
+  @ValidateIf((value: RegisterDto) => value.role === 'facility')
+  @IsString()
+  @IsNotEmpty()
+  address?: string;
 }

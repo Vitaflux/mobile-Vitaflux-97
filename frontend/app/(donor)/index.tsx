@@ -15,7 +15,10 @@ import { MapPin } from "lucide-react-native";
 import MapView, { Marker } from "react-native-maps";
 import { useAuth } from "../../src/store/auth";
 import { getMyProfile } from "../../src/api/profiles";
-import { getNearbyHospitals } from "../../src/api/hospitals";
+import {
+  getNearbyHospitals,
+  type NearbyHospital,
+} from "../../src/api/hospitals";
 import { haversineKm } from "../../src/lib/haversine";
 import DonorReminderCard from "../../src/components/DonorReminderCard";
 
@@ -405,11 +408,11 @@ export default function DonorHome() {
               {/* Heading */}
               <View className="flex-row items-baseline justify-between mt-7">
                 <Text className="font-archivo-bold text-judul text-ink">
-                  Cocok untukmu
+                  Rumah sakit di sekitarmu
                 </Text>
 
                 <Text className="font-archivo text-caption text-ink-muted">
-                  {filteredMatches.length} kebutuhan
+                  {mapHospitals.length} rumah sakit
                 </Text>
               </View>
 
@@ -552,29 +555,31 @@ export default function DonorHome() {
                     })}
                   </MapView>
                 </View>
-              ) : filteredMatches.length === 0 ? (
+              ) : mapHospitals.length === 0 ? (
                 <View className="mt-6 rounded-[18px] border border-line bg-surface p-5">
                   <Text className="font-archivo-bold text-body text-ink">
-                    Belum ada kebutuhan cocok
+                    Belum ada rumah sakit di radius ini
                   </Text>
 
                   <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                    {profile?.eligibility.is_eligible
-                      ? "Tidak ada kebutuhan yang cocok dengan filter dan radius ini."
-                      : "Kamu belum boleh donor sekarang, jadi kebutuhan belum ditampilkan."}
+                    Coba pilih radius yang lebih luas atau ubah filter kebutuhan.
                   </Text>
                 </View>
               ) : (
                 <View className="gap-3 mt-4">
-                  {filteredMatches.map((blood) => {
-                    const distance = distanceKm(blood.hospital?.location);
+                  {mapHospitals.map((hospital) => {
+                    const distance = distanceKm(hospital.location);
+                    const hospitalNeeds = filteredMatches.filter(
+                      (blood) => blood.hospital?.id === hospital.id,
+                    );
 
                     return (
-                      <MatchCard
-                        key={blood.id}
-                        blood={blood}
+                      <HospitalCard
+                        key={hospital.id}
+                        hospital={hospital}
+                        bloodNeeds={hospitalNeeds}
                         distance={distance}
-                        onPress={() => openMatchDetail(blood)}
+                        onSelectNeed={openMatchDetail}
                       />
                     );
                   })}
@@ -588,75 +593,34 @@ export default function DonorHome() {
   );
 }
 
-function MatchCard({
-  blood,
+function HospitalCard({
+  hospital,
+  bloodNeeds,
   distance,
-  onPress,
+  onSelectNeed,
 }: {
-  blood: Match;
+  hospital: NearbyHospital;
+  bloodNeeds: Match[];
   distance: number | null;
-  onPress: () => void;
+  onSelectNeed: (blood: Match) => void;
 }) {
-  const urgent = blood.status_blood === "urgent";
-
-  const hasProgress =
-    typeof blood.applicants_count === "number" &&
-    typeof blood.collected === "number";
-
-  const collected = blood.collected ?? 0;
-
-  const percentage =
-    blood.quantity <= 0
-      ? 0
-      : Math.min(100, Math.round((collected / blood.quantity) * 100));
-
-  const component = blood.component
-    ? (COMPONENT_LABELS[blood.component] ?? blood.component)
-    : null;
-
   return (
-    <Pressable
-      onPress={onPress}
-      className="rounded-[18px] border border-line bg-surface p-4 active:bg-ground"
-    >
-      <View className="flex-row items-center justify-between">
-        <View
-          className={`rounded-pill px-3 py-1 ${
-            urgent ? "bg-primary" : "bg-ground"
-          }`}
-        >
-          <Text
-            className={`font-archivo-bold text-overline tracking-overline ${
-              urgent ? "text-white" : "text-ink-muted"
-            }`}
-          >
-            {urgent ? "MENDESAK" : "TERJADWAL"}
-          </Text>
-        </View>
+    <View className="rounded-[18px] border border-line bg-surface p-4">
+      <View className="flex-row items-start justify-between gap-3">
+        <Text className="flex-1 font-archivo-bold text-body text-ink">
+          {hospital.hospital_name}
+        </Text>
 
-        <View className="px-3 py-1 rounded-pill bg-primary-soft">
-          <Text className="font-archivo-bold text-caption text-primary-dark">
-            {blood.blood_type}
-            {blood.rhesus}
-          </Text>
-        </View>
+        {hospital.isVerified ? (
+          <View className="px-3 py-1 rounded-pill bg-primary-soft">
+            <Text className="font-archivo-bold text-overline text-primary-dark">
+              TERVERIFIKASI
+            </Text>
+          </View>
+        ) : null}
       </View>
 
-      <Text className="mt-3 font-archivo-bold text-body text-ink">
-        {blood.title || "Kebutuhan darah"}
-      </Text>
-
-      <Text className="mt-1 font-archivo-semibold text-caption text-ink">
-        {blood.hospital?.hospital_name ?? "Fasilitas kesehatan"}
-      </Text>
-
-      {blood.is_compatible === false ? (
-        <Text className="mt-2 font-archivo-semibold text-caption text-ink-muted">
-          Tidak cocok dengan golongan darahmu
-        </Text>
-      ) : null}
-
-      {blood.hospital?.address ? (
+      {hospital.address ? (
         <View className="flex-row items-start mt-2">
           <MapPin color="#605D5D" size={16} />
 
@@ -664,44 +628,70 @@ function MatchCard({
             className="flex-1 ml-2 font-archivo text-caption text-ink-muted"
             numberOfLines={2}
           >
-            {blood.hospital.address}
+            {hospital.address}
           </Text>
         </View>
       ) : null}
 
       <Text className="mt-2 font-archivo text-caption text-ink-muted">
         {distance !== null ? `${distance.toFixed(1)} km · ` : ""}
-        {formatSchedule(blood.schedule, blood.schedule_end)}
+        {hospital.active_needs_count} kebutuhan aktif
       </Text>
 
-      {component ? (
-        <Text className="mt-2 font-archivo text-caption text-ink-muted">
-          {component}
+      {bloodNeeds.length === 0 ? (
+        <Text className="mt-3 font-archivo text-caption text-ink-muted">
+          Belum ada kebutuhan darah aktif untuk filter ini.
         </Text>
-      ) : null}
-
-      {hasProgress ? (
-        <>
-          <Text className="mt-3 font-archivo-semibold text-caption text-ink">
-            {blood.applicants_count} pendaftar
-            {" · "}
-            {collected} dari {blood.quantity} kantong
-          </Text>
-
-          <View className="h-2 mt-2 overflow-hidden rounded-pill bg-ground">
-            <View
-              className="h-full rounded-pill bg-primary"
-              style={{
-                width: `${percentage}%`,
-              }}
-            />
-          </View>
-        </>
       ) : (
-        <Text className="mt-3 font-archivo-semibold text-caption text-ink">
-          {blood.quantity} kantong dibutuhkan
-        </Text>
+        <View className="gap-2 mt-3">
+          {bloodNeeds.map((blood) => {
+            const urgent = blood.status_blood === "urgent";
+            const component = blood.component
+              ? (COMPONENT_LABELS[blood.component] ?? blood.component)
+              : null;
+
+            return (
+              <Pressable
+                key={blood.id}
+                onPress={() => onSelectNeed(blood)}
+                className="p-3 border rounded-[14px] border-line bg-ground active:bg-primary-soft"
+              >
+                <View className="flex-row items-center justify-between gap-3">
+                  <Text className="flex-1 font-archivo-semibold text-caption text-ink">
+                    {blood.title || "Kebutuhan darah"}
+                  </Text>
+
+                  <View
+                    className={`rounded-pill px-3 py-1 ${
+                      urgent ? "bg-primary" : "bg-surface"
+                    }`}
+                  >
+                    <Text
+                      className={`font-archivo-bold text-caption ${
+                        urgent ? "text-white" : "text-primary-dark"
+                      }`}
+                    >
+                      {blood.blood_type}
+                      {blood.rhesus}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                  {formatSchedule(blood.schedule, blood.schedule_end)}
+                  {component ? ` · ${component}` : ""}
+                </Text>
+
+                {blood.is_compatible === false ? (
+                  <Text className="mt-1 font-archivo-semibold text-caption text-ink-muted">
+                    Hanya dapat dilihat — golongan darah tidak cocok
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
       )}
-    </Pressable>
+    </View>
   );
 }
