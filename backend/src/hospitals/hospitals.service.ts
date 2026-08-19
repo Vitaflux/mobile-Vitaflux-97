@@ -15,7 +15,7 @@ import { UpdateHospitalProfileDto } from './dto/update-hospital-profile.dto';
 export class HospitalsService {
   constructor(
     @InjectModel(Hospital)
-    private readonly hospitalModel: Hospital,
+    private readonly hospitalModel: typeof Hospital,
 
     @InjectModel(Blood)
     private readonly bloodModel: Blood,
@@ -43,17 +43,23 @@ export class HospitalsService {
       };
     }
 
-    const nearbyHospitals = await this.hospitalModel
-      .where('location', {
-        $near: {
-          $geometry: profile.location,
-          $maxDistance: radius,
+    const hospitalCollection = this.hospitalModel
+      .query()
+      .getMongoDBCollection();
+
+    const nearbyHospitals = await hospitalCollection
+      .find({
+        location: {
+          $near: {
+            $geometry: profile.location,
+            $maxDistance: radius,
+          },
         },
       })
-      .get();
+      .toArray();
 
     const data = await Promise.all(
-      Array.from(nearbyHospitals).map(async (hospital) => {
+      nearbyHospitals.map(async (hospital) => {
         const bloods = await this.bloodModel
           .where('hospitals_id', hospital._id)
           .get();

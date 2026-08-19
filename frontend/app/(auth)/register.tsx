@@ -11,10 +11,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
+import * as Location from "expo-location";
+import { MapPin } from "lucide-react-native";
 import { useAuth } from "../../src/store/auth";
 import { errorMessage } from "../../src/lib/errorMessage";
 
 type Role = "donor" | "facility";
+type BloodType = "A" | "B" | "AB" | "O";
+type Rhesus = "+" | "-";
+
+const BLOOD_TYPES: BloodType[] = ["A", "B", "AB", "O"];
 
 export default function Register() {
   const register = useAuth((s) => s.register);
@@ -22,6 +28,11 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [bloodType, setBloodType] = useState<BloodType>("A");
+  const [rhesus, setRhesus] = useState<Rhesus>("+");
+  const [address, setAddress] = useState("");
+  const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
+  const [locating, setLocating] = useState(false);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -29,9 +40,52 @@ export default function Register() {
   const nameLabel = donor ? "Nama lengkap" : "Nama fasilitas";
   const namePlaceholder = donor ? "Sesuai KTP" : "Contoh: UDD PMI Kota Bandung";
 
+  async function selectLocation() {
+    setLocating(true);
+
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== "granted") {
+        Alert.alert(
+          "Izin lokasi diperlukan",
+          "Lokasi diperlukan agar donor dan fasilitas di sekitar dapat ditemukan.",
+        );
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      setCoordinates([
+        currentLocation.coords.longitude,
+        currentLocation.coords.latitude,
+      ]);
+    } catch (error) {
+      Alert.alert(
+        "Lokasi gagal diambil",
+        errorMessage(error, "Aktifkan GPS lalu coba lagi."),
+      );
+    } finally {
+      setLocating(false);
+    }
+  }
+
   async function onSubmit() {
     if (!name || !email || !password) {
       Alert.alert("Lengkapi data", "Nama, email, dan kata sandi wajib diisi.");
+      return;
+    }
+    if (!donor && !address.trim()) {
+      Alert.alert("Lengkapi data", "Alamat fasilitas wajib diisi.");
+      return;
+    }
+    if (!coordinates) {
+      Alert.alert(
+        "Lokasi belum ada",
+        "Tekan Gunakan lokasi saat ini terlebih dahulu.",
+      );
       return;
     }
     if (password.length < 8) {
@@ -44,7 +98,24 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register({ email: email.trim(), password, role, name: name.trim() });
+      await register({
+        email: email.trim(),
+        password,
+        role,
+        name: name.trim(),
+        location: {
+          type: "Point",
+          coordinates,
+        },
+        ...(donor
+          ? {
+              blood_type: bloodType,
+              rhesus,
+            }
+          : {
+              address: address.trim(),
+            }),
+      });
       Alert.alert(
         "Akun dibuat",
         "Silakan masuk dengan email dan kata sandimu.",
@@ -112,6 +183,98 @@ export default function Register() {
             placeholderTextColor="#9b9797"
             className="mb-5 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
           />
+
+          {donor ? (
+            <>
+              <Text className="mb-2 font-archivo-medium text-caption text-ink">
+                Golongan darah
+              </Text>
+
+              <View className="flex-row gap-2 mb-4">
+                {BLOOD_TYPES.map((item) => (
+                  <Pressable
+                    key={item}
+                    onPress={() => setBloodType(item)}
+                    className={`flex-1 items-center rounded-pill border py-3 ${
+                      bloodType === item
+                        ? "border-primary bg-primary"
+                        : "border-line bg-surface"
+                    }`}
+                  >
+                    <Text
+                      className={`font-archivo-bold text-caption ${
+                        bloodType === item ? "text-white" : "text-ink"
+                      }`}
+                    >
+                      {item}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <View className="flex-row gap-2 mb-5">
+                {(["+", "-"] as Rhesus[]).map((item) => (
+                  <Pressable
+                    key={item}
+                    onPress={() => setRhesus(item)}
+                    className={`flex-1 items-center rounded-pill border py-3 ${
+                      rhesus === item
+                        ? "border-primary bg-primary"
+                        : "border-line bg-surface"
+                    }`}
+                  >
+                    <Text
+                      className={`font-archivo-bold text-caption ${
+                        rhesus === item ? "text-white" : "text-ink"
+                      }`}
+                    >
+                      Rhesus {item}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : (
+            <>
+              <Text className="mb-2 font-archivo-medium text-caption text-ink">
+                Alamat fasilitas
+              </Text>
+              <TextInput
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Alamat lengkap fasilitas"
+                placeholderTextColor="#9b9797"
+                multiline
+                className="mb-5 min-h-24 rounded-card border border-line px-4 py-[14px] font-archivo text-body text-ink"
+              />
+            </>
+          )}
+
+          <Text className="mb-2 font-archivo-medium text-caption text-ink">
+            Lokasi {donor ? "saat ini" : "fasilitas"}
+          </Text>
+          <Pressable
+            onPress={selectLocation}
+            disabled={locating}
+            className={`mb-5 flex-row items-center justify-center rounded-pill border py-4 ${
+              coordinates
+                ? "border-primary bg-primary-soft"
+                : "border-line bg-surface"
+            }`}
+          >
+            {locating ? (
+              <ActivityIndicator color="#EC3013" />
+            ) : (
+              <>
+                <MapPin color="#EC3013" size={18} />
+                <Text className="ml-2 font-archivo-semibold text-caption text-primary-dark">
+                  {coordinates
+                    ? "Lokasi berhasil dipilih"
+                    : "Gunakan lokasi saat ini"}
+                </Text>
+              </>
+            )}
+          </Pressable>
 
           <Text className="mb-2 font-archivo-medium text-caption text-ink">Email</Text>
           <TextInput
