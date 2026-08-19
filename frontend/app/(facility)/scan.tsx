@@ -5,6 +5,9 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -484,89 +487,103 @@ function ConfirmationScreen({
     <View className="flex-1 bg-ground">
       <StatusBar style="dark" />
 
-      <SafeAreaView className="items-center justify-center flex-1 px-6">
-        <View className="items-center justify-center w-20 h-20 rounded-pill bg-primary-soft">
-          <QrCode color="#A31B0A" size={38} />
-        </View>
-
-        <Text className="mt-6 text-center font-archivo-bold text-judul text-ink">
-          QR terbaca
-        </Text>
-
-        <Text className="mt-2 text-center font-archivo text-body text-ink-muted">
-          {displayValue}
-        </Text>
-
-        <View className="w-full p-5 mt-6 border rounded-card border-line bg-surface">
-          <Text className="font-archivo-bold text-body text-ink">
-            Konfirmasi check-in
-          </Text>
-
-          <Text className="mt-1 font-archivo text-caption text-ink-muted">
-            Setelah dikonfirmasi, status donor akan berubah menjadi Selesai.
-          </Text>
-
-          <Text className="mt-5 font-archivo-semibold text-caption text-ink">
-            Volume darah (ml)
-          </Text>
-
-          <TextInput
-            value={volumeMl}
-            onChangeText={(value) =>
-              onVolumeChange(value.replace(/[^0-9]/g, ""))
-            }
-            placeholder="Contoh: 350"
-            placeholderTextColor="#9B9797"
-            keyboardType="number-pad"
-            maxLength={4}
-            className="px-4 py-4 mt-2 border rounded-card border-line bg-ground font-archivo-bold text-body text-ink"
-          />
-
-          <View className="flex-row mt-3 gap-x-2">
-            {[250, 350, 450].map((amount) => (
-              <Pressable
-                key={amount}
-                onPress={() => onVolumeChange(String(amount))}
-                className={`flex-1 items-center rounded-pill border py-2 ${
-                  volumeMl === String(amount)
-                    ? "border-primary bg-primary-soft"
-                    : "border-line bg-surface"
-                }`}
-              >
-                <Text className="font-archivo-semibold text-caption text-ink">
-                  {amount} ml
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <Pressable
-          onPress={onConfirm}
-          disabled={processing || !volumeValid}
-          className={`items-center w-full py-4 mt-6 rounded-pill ${
-            volumeValid ? "bg-primary active:bg-primary-dark" : "bg-primary/50"
-          }`}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
+          showsVerticalScrollIndicator={false}
         >
-          {processing ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text className="text-white font-archivo-bold text-body">
-              Tandai selesai
+          <SafeAreaView className="items-center px-6 py-6">
+            <View className="items-center justify-center w-20 h-20 rounded-pill bg-primary-soft">
+              <QrCode color="#A31B0A" size={38} />
+            </View>
+
+            <Text className="mt-6 text-center font-archivo-bold text-judul text-ink">
+              QR terbaca
             </Text>
-          )}
-        </Pressable>
 
-        <Pressable
-          onPress={onCancel}
-          disabled={processing}
-          className="items-center w-full py-4 mt-3 border rounded-pill border-line bg-surface"
-        >
-          <Text className="font-archivo-semibold text-body text-ink">
-            Batal
-          </Text>
-        </Pressable>
-      </SafeAreaView>
+            <Text className="mt-2 text-center font-archivo text-body text-ink-muted">
+              {displayValue}
+            </Text>
+
+            <View className="w-full p-5 mt-6 border rounded-card border-line bg-surface">
+              <Text className="font-archivo-bold text-body text-ink">
+                Konfirmasi check-in
+              </Text>
+
+              <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                Setelah dikonfirmasi, status donor akan berubah menjadi Selesai.
+              </Text>
+
+              <Text className="mt-5 font-archivo-semibold text-caption text-ink">
+                Volume darah (ml)
+              </Text>
+
+              <TextInput
+                value={volumeMl}
+                onChangeText={(value) =>
+                  onVolumeChange(value.replace(/[^0-9]/g, ""))
+                }
+                placeholder="Contoh: 350"
+                placeholderTextColor="#9B9797"
+                keyboardType="number-pad"
+                maxLength={4}
+                className="px-4 py-4 mt-2 border rounded-card border-line bg-ground font-archivo-bold text-body text-ink"
+              />
+
+              <View className="flex-row mt-3 gap-x-2">
+                {[250, 350, 450].map((amount) => (
+                  <Pressable
+                    key={amount}
+                    onPress={() => onVolumeChange(String(amount))}
+                    className={`flex-1 items-center rounded-pill border py-2 ${
+                      volumeMl === String(amount)
+                        ? "border-primary bg-primary-soft"
+                        : "border-line bg-surface"
+                    }`}
+                  >
+                    <Text className="font-archivo-semibold text-caption text-ink">
+                      {amount} ml
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <Pressable
+              onPress={onConfirm}
+              disabled={processing || !volumeValid}
+              className={`items-center w-full py-4 mt-6 rounded-pill ${
+                volumeValid
+                  ? "bg-primary active:bg-primary-dark"
+                  : "bg-primary/50"
+              }`}
+            >
+              {processing ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text className="text-white font-archivo-bold text-body">
+                  Tandai selesai
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={onCancel}
+              disabled={processing}
+              className="items-center w-full py-4 mt-3 border rounded-pill border-line bg-surface"
+            >
+              <Text className="font-archivo-semibold text-body text-ink">
+                Batal
+              </Text>
+            </Pressable>
+          </SafeAreaView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
