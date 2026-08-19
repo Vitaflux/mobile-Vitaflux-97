@@ -20,6 +20,9 @@ import { getMyProfile, updateMyProfile } from "../../src/api/profiles";
 import { errorMessage } from "../../src/lib/errorMessage";
 import type { BloodType, Rhesus } from "../../src/types/models";
 import { Bell } from "lucide-react-native";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 
 const MIN_DAYS = 90;
 
@@ -76,10 +79,18 @@ export default function DonorProfile() {
 
   const queryClient = useQueryClient();
 
+  const profileKey = ["profile", user?.email ?? "guest"] as const;
+
+  const [showBirthDatePicker, setShowBirthDatePicker] = useState(false);
+
+  const [showLastDonationPicker, setShowLastDonationPicker] = useState(false);
+
   const profileQuery = useQuery({
-    queryKey: ["profile"],
-    queryFn: () => getMyProfile(),
+    queryKey: profileKey,
+    queryFn: getMyProfile,
+    enabled: Boolean(user),
     retry: false,
+    refetchOnMount: "always",
   });
 
   const [golongan, setGolongan] = useState<BloodType>("O");
@@ -101,6 +112,21 @@ export default function DonorProfile() {
   const [locating, setLocating] = useState(false);
 
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    /*
+     * Kosongkan tampilan terlebih dahulu ketika akun berubah,
+     * agar profil akun sebelumnya tidak sempat terlihat.
+     */
+    setGolongan("O");
+    setRhesus("+");
+    setBirthDate("");
+    setWeight("");
+    setCity("");
+    setLastDonation("");
+    setRadiusKm(10);
+    setCoordinates(null);
+  }, [user?.email]);
 
   useEffect(() => {
     const profile = profileQuery.data;
@@ -174,6 +200,29 @@ export default function DonorProfile() {
     }
   }
 
+  function onBirthDateChange(event: DateTimePickerEvent, selectedDate?: Date) {
+    setShowBirthDatePicker(false);
+
+    if (event.type === "dismissed" || !selectedDate) {
+      return;
+    }
+
+    setBirthDate(dateInput(selectedDate.toISOString()));
+  }
+
+  function onLastDonationChange(
+    event: DateTimePickerEvent,
+    selectedDate?: Date,
+  ) {
+    setShowLastDonationPicker(false);
+
+    if (event.type === "dismissed" || !selectedDate) {
+      return;
+    }
+
+    setLastDonation(dateInput(selectedDate.toISOString()));
+  }
+
   async function onSave() {
     if (!coordinates) {
       Alert.alert(
@@ -234,7 +283,12 @@ export default function DonorProfile() {
         queryClient.invalidateQueries({
           queryKey: ["my-profile"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["matching-bloods"],
+        }),
       ]);
+
+      await profileQuery.refetch();
 
       Alert.alert("Tersimpan", "Profil berhasil diperbarui.");
     } catch (error: any) {
@@ -248,9 +302,19 @@ export default function DonorProfile() {
   }
 
   async function onLogout() {
-    await logout();
+    try {
+      await logout();
 
-    router.replace("/(auth)/login");
+      /*
+       * Hapus profil, riwayat, kebutuhan, dan data akun lama
+       * dari cache React Query.
+       */
+      queryClient.clear();
+
+      router.replace("/(auth)/login");
+    } catch (error: any) {
+      Alert.alert("Gagal keluar", errorMessage(error, "Coba lagi."));
+    }
   }
 
   if (profileQuery.isLoading) {
@@ -397,19 +461,39 @@ export default function DonorProfile() {
           />
 
           {/* Birth date */}
+          {/* Birth date */}
           <View className="h-4" />
 
           <Label>Tanggal lahir</Label>
 
-          <TextInput
-            value={birthDate}
-            onChangeText={setBirthDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor="#9B9797"
-            keyboardType="numbers-and-punctuation"
-            maxLength={10}
-            className={inputClass}
-          />
+          <Pressable
+            onPress={() => setShowBirthDatePicker(true)}
+            className="flex-row items-center rounded-card border border-line bg-surface px-4 py-[14px]"
+          >
+            <CalendarDays color="#605D5D" size={20} />
+
+            <Text
+              className={`ml-3 flex-1 font-archivo text-body ${
+                birthDate ? "text-ink" : "text-ink-muted"
+              }`}
+            >
+              {birthDate || "Pilih tanggal lahir"}
+            </Text>
+          </Pressable>
+
+          {showBirthDatePicker ? (
+            <DateTimePicker
+              value={
+                birthDate
+                  ? new Date(`${birthDate}T12:00:00`)
+                  : new Date(2000, 0, 1)
+              }
+              mode="date"
+              display="default"
+              maximumDate={new Date()}
+              onChange={onBirthDateChange}
+            />
+          ) : null}
 
           {/* Weight */}
           <View className="h-4" />
@@ -446,23 +530,48 @@ export default function DonorProfile() {
           />
 
           {/* Last donation */}
+          {/* Last donation */}
           <View className="h-4" />
 
           <Label>Tanggal donor terakhir</Label>
 
-          <View className="flex-row items-center">
+          <Pressable
+            onPress={() => setShowLastDonationPicker(true)}
+            className="flex-row items-center rounded-card border border-line bg-surface px-4 py-[14px]"
+          >
             <CalendarDays color="#605D5D" size={20} />
 
-            <TextInput
-              value={lastDonation}
-              onChangeText={setLastDonation}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#9B9797"
-              keyboardType="numbers-and-punctuation"
-              maxLength={10}
-              className={`${inputClass} flex-1 ml-3`}
+            <Text
+              className={`ml-3 flex-1 font-archivo text-body ${
+                lastDonation ? "text-ink" : "text-ink-muted"
+              }`}
+            >
+              {lastDonation || "Pilih tanggal donor terakhir"}
+            </Text>
+          </Pressable>
+
+          {lastDonation ? (
+            <Pressable
+              onPress={() => setLastDonation("")}
+              className="self-start px-1 py-2 mt-1"
+            >
+              <Text className="font-archivo-semibold text-caption text-primary-dark">
+                Kosongkan tanggal
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {showLastDonationPicker ? (
+            <DateTimePicker
+              value={
+                lastDonation ? new Date(`${lastDonation}T12:00:00`) : new Date()
+              }
+              mode="date"
+              display="default"
+              maximumDate={new Date()}
+              onChange={onLastDonationChange}
             />
-          </View>
+          ) : null}
 
           {/* Radius */}
           <View className="h-4" />
