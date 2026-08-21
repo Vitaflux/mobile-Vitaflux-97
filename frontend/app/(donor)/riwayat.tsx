@@ -208,16 +208,6 @@ export default function Riwayat() {
                 </Text>
               </Pressable>
             </View>
-          ) : histories.length === 0 ? (
-            <View className="p-5 mt-6 border rounded-card border-line bg-surface">
-              <Text className="font-archivo-semibold text-body text-ink">
-                Belum ada riwayat
-              </Text>
-
-              <Text className="mt-1 font-archivo text-caption text-ink-muted">
-                Donasi yang sudah selesai akan muncul di sini.
-              </Text>
-            </View>
           ) : (
             <>
               {/* Kartu donor digital */}
@@ -360,65 +350,78 @@ export default function Riwayat() {
               </Text>
 
               <View className="gap-3 mt-3">
-                {histories.map((history) => (
-                  <View
-                    key={history.id}
-                    className="p-5 border rounded-card border-line bg-surface"
-                  >
-                    <View className="flex-row items-start justify-between">
-                      <View className="flex-1 mr-3">
-                        <Text className="font-archivo-bold text-body text-ink">
-                          {history.hospital?.hospital_name ??
-                            "Fasilitas kesehatan"}
-                        </Text>
+                {histories.length === 0 ? (
+                  <View className="p-5 border rounded-card border-line bg-surface">
+                    <Text className="font-archivo-semibold text-body text-ink">
+                      Belum ada riwayat
+                    </Text>
 
-                        <View className="flex-row items-center mt-1">
-                          <CalendarDays color="#6F6A68" size={15} />
+                    <Text className="mt-1 font-archivo text-caption text-ink-muted">
+                      Donasi yang sudah selesai akan muncul di sini.
+                    </Text>
+                  </View>
+                ) : (
+                  histories.map((history) => (
+                    <View
+                      key={history.id}
+                      className="p-5 border rounded-card border-line bg-surface"
+                    >
+                      <View className="flex-row items-start justify-between">
+                        <View className="flex-1 mr-3">
+                          <Text className="font-archivo-bold text-body text-ink">
+                            {history.hospital?.hospital_name ??
+                              "Fasilitas kesehatan"}
+                          </Text>
 
-                          <Text className="ml-2 font-archivo text-caption text-ink-muted">
-                            {formatDate(
-                              history.checked_in_at ?? history.blood?.schedule,
-                            )}
+                          <View className="flex-row items-center mt-1">
+                            <CalendarDays color="#6F6A68" size={15} />
+
+                            <Text className="ml-2 font-archivo text-caption text-ink-muted">
+                              {formatDate(
+                                history.checked_in_at ??
+                                  history.blood?.schedule,
+                              )}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View className="px-3 py-1 rounded-pill bg-primary-soft">
+                          <Text className="font-archivo-bold text-overline tracking-overline text-primary-dark">
+                            SELESAI
                           </Text>
                         </View>
                       </View>
 
-                      <View className="px-3 py-1 rounded-pill bg-primary-soft">
-                        <Text className="font-archivo-bold text-overline tracking-overline text-primary-dark">
-                          SELESAI
-                        </Text>
+                      <View className="pt-4 mt-4 border-t border-line">
+                        <DetailRow
+                          label="Golongan"
+                          value={
+                            history.blood
+                              ? `${history.blood.blood_type}${history.blood.rhesus}`
+                              : "-"
+                          }
+                        />
+
+                        <DetailRow
+                          label="Komponen"
+                          value={formatComponent(history.blood?.component)}
+                        />
+
+                        <DetailRow
+                          label="Volume"
+                          value={formatVolume(history.volume_ml)}
+                          last
+                        />
                       </View>
+
+                      {history.hospital?.address ? (
+                        <Text className="pt-3 mt-3 border-t font-archivo text-caption text-ink-muted border-line">
+                          {history.hospital.address}
+                        </Text>
+                      ) : null}
                     </View>
-
-                    <View className="pt-4 mt-4 border-t border-line">
-                      <DetailRow
-                        label="Golongan"
-                        value={
-                          history.blood
-                            ? `${history.blood.blood_type}${history.blood.rhesus}`
-                            : "-"
-                        }
-                      />
-
-                      <DetailRow
-                        label="Komponen"
-                        value={formatComponent(history.blood?.component)}
-                      />
-
-                      <DetailRow
-                        label="Volume"
-                        value={formatVolume(history.volume_ml)}
-                        last
-                      />
-                    </View>
-
-                    {history.hospital?.address ? (
-                      <Text className="pt-3 mt-3 border-t font-archivo text-caption text-ink-muted border-line">
-                        {history.hospital.address}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))}
+                  ))
+                )}
               </View>
             </>
           )}

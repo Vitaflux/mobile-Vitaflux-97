@@ -242,7 +242,6 @@ export default function DonorHome() {
     queryKey: ["nearby-hospitals", radiusMeters],
     queryFn: () => getNearbyHospitals(radiusMeters),
     enabled: Boolean(profileQuery.data),
-    refetchInterval: 5000,
   });
 
   const completedRequestsQuery = useQuery({
